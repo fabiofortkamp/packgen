@@ -9,7 +9,9 @@ authors = [
     { name = "Andreas Papanikolaou", email = "" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "numpy>=2.2.3",
+]
 
 [project.scripts]
 packgen = "packgen:main"
@@ -17,3 +19,9 @@ packgen = "packgen:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]
+
