@@ -11,7 +11,7 @@ import array as arr
 import numpy as np
 
 
-def polygon_volume(sides, radii, heights):
+def volume_prism(sides, radii, heights):
     # https://en.wikipedia.org/wiki/Regular_polygon
 
     sides = np.array(sides)
@@ -28,7 +28,7 @@ def number_ratio(mass_ratio, densities, heights, radii, total_mass):
     """
 
     # Calculate the volumes of each particle
-    particle_volumes = polygon_volume([6] * len(radii), radii, heights)
+    particle_volumes = volume_prism([6] * len(radii), radii, heights)
 
     # What percentage of the total mass is taken by each type of particle in the mixture?
     mass_percentages = [x / sum(mass_ratio) for x in mass_ratio]
