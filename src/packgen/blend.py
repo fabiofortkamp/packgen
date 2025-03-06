@@ -18,7 +18,7 @@ def polygon_volume(sides, radii, heights):
     radii = np.array(radii)
     heights = np.array(heights)
 
-    return 1 / 2 * np.square(radii) * np.sin(2 * np.pi / sides) * heights
+    return 1 / 2 * sides * np.square(radii) * np.sin(2 * np.pi / sides) * heights
 
 
 # Mass fractions
