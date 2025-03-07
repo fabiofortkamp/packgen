@@ -79,6 +79,12 @@ def main():
         Packing(
             mass_ratio_A=0.5, densities=(1.0, 1.0), radii=(1.0, 1.0), heights=(1.0, 1.0)
         ),
+        Packing(
+            mass_ratio_A=0.5, densities=(0.5, 1.0), radii=(1.0, 1.0), heights=(1.0, 1.0)
+        ),
+        Packing(
+            mass_ratio_A=0.5, densities=(1.0, 0.5), radii=(1.0, 1.0), heights=(1.0, 1.0)
+        ),
     ]
     results = calculate_results(packings)
     print(tabulate(results))
