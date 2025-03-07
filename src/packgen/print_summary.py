@@ -4,6 +4,9 @@ from packgen.blend import number_ratio, volume_prism
 
 from dataclasses import dataclass
 
+from rich import print
+from rich.table import Table
+
 type ParticlesValues = tuple[float, float]
 
 N_SIDES = 6
@@ -51,17 +54,35 @@ def calculate_results(packings: list[Packing]) -> list[dict[str, float]]:
     return results
 
 
+def tabulate(results: list[dict[str, float]]) -> Table:
+    table = Table()
+    example = results[0]
+    for name in example.keys():
+        table.add_column(name)
+
+    for r in results:
+        table.add_row(
+            str(r["mass fraction A"]),
+            str(r["density A"]),
+            str(r["density B"]),
+            str(r["volume A"]),
+            str(r["volume B"]),
+            str(r["number ratio A"]),
+        )
+
+    return table
+
+
 def main():
     """Generate and print table."""
     packings = [
         Packing(
             mass_ratio_A=0.5, densities=(1.0, 1.0), radii=(1.0, 1.0), heights=(1.0, 1.0)
-        )
+        ),
     ]
     results = calculate_results(packings)
-    print(results)
+    print(tabulate(results))
 
 
 if __name__ == "__main__":
     main()
-
