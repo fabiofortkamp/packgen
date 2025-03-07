@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 packgen = "packgen:main"
+summary = "packgen.print_summary:main"
 
 [build-system]
 requires = ["hatchling"]
