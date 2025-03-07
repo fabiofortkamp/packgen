@@ -1,6 +1,6 @@
 """Print summary of the mass fraction calculations."""
 
-from packgen.blend import number_ratio
+from packgen.blend import number_ratio, volume_prism
 
 from dataclasses import dataclass
 
@@ -33,6 +33,24 @@ class Packing:
         return (number_ratios[0], number_ratios[1])
 
 
+def calculate_results(packings: list[Packing]) -> list[dict[str, float]]:
+    results = []
+    for packing in packings:
+        volumes = volume_prism(N_SIDES, packing.radii, heights=packing.heights)
+        nA, _ = packing.number_ratios()
+        r = {
+            "mass fraction A": packing.mass_ratio_A,
+            "density A": packing.densities[0],
+            "density B": packing.densities[1],
+            "volume A": float(volumes[0]),
+            "volume B": float(volumes[1]),
+            "number ratio A": nA,
+        }
+        results.append(r)
+
+    return results
+
+
 def main():
     """Generate and print table."""
     packings = [
@@ -40,8 +58,8 @@ def main():
             mass_ratio_A=0.5, densities=(1.0, 1.0), radii=(1.0, 1.0), heights=(1.0, 1.0)
         )
     ]
-    for packing in packings:
-        print(packing.number_ratios())
+    results = calculate_results(packings)
+    print(results)
 
 
 if __name__ == "__main__":
