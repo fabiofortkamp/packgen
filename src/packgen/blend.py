@@ -209,6 +209,14 @@ def main():
 
     add_passive_rigidbody(cube)
 
+    def stop_playback(scene):
+        if scene.frame_current == 200:
+            bpy.ops.screen.animation_cancel(restore_frame=False)
+            bpy.ops.object.delete(use_global=False)
+
+    bpy.app.handlers.frame_change_pre.append(stop_playback)
+
+    bpy.ops.screen.animation_play()
 
 if __name__ == "__main__":
     main()
