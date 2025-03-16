@@ -9,6 +9,7 @@ except ImportError:
 import random
 import array as arr
 import numpy as np
+import os
 
 
 def volume_prism(sides, radii, heights):
@@ -209,10 +210,18 @@ def main():
 
     add_passive_rigidbody(cube)
 
+
+    def export_stl():
+        stl_path = os.path.join(os.path.expanduser("~"), "packgen_result.stl")
+
+        print("Exporting to", stl_path)
+        bpy.ops.wm.stl_export(filepath=stl_path)
+        
     def stop_playback(scene):
         if scene.frame_current == 200:
             bpy.ops.screen.animation_cancel(restore_frame=False)
             bpy.ops.object.delete(use_global=False)
+            export_stl()
 
     bpy.app.handlers.frame_change_pre.append(stop_playback)
 
