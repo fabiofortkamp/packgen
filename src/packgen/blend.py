@@ -22,7 +22,7 @@ def volume_prism(sides, radii, heights):
 
 
 # Mass fractions
-def number_ratio(mass_ratio, densities, heights, radii, total_mass):
+def number_ratio(mass_ratio, densities, heights, radii, total_volume):
     """
     Calculate the number ratio of the materials in the mixture given the mass ratio, densities, volumes and total mass of the components.
     """
@@ -33,11 +33,17 @@ def number_ratio(mass_ratio, densities, heights, radii, total_mass):
     # What percentage of the total mass is taken by each type of particle in the mixture?
     mass_percentages = [x / sum(mass_ratio) for x in mass_ratio]
 
-    # What is mass, volume and number of each type of particle in the mixture?
-    mass_components = [x * total_mass for x in mass_percentages]
-    volume_components = [
-        x / y if y > 0 else 0 for x, y in zip(mass_components, densities)
+    sum_of_densities = sum([density for density, mass_ratio_i in zip(densities, mass_ratio) 
+                            if mass_ratio_i > 0
+                            ])
+
+    volume_ratios = [
+        x / (y / sum_of_densities) for x, y in zip(mass_percentages, densities)
     ]
+
+    volume_percentages = np.array(volume_ratios) / sum(volume_ratios)
+
+    volume_components = volume_percentages * total_volume
 
     # must round up or down to the nearest integer
     number_components = [
@@ -55,7 +61,6 @@ def number_ratio(mass_ratio, densities, heights, radii, total_mass):
 # 4) In the "Timeline" press "Play"
 # 5) Erase the cube and export as stl.
 
-GlobalScaleFactor = 2.5
 # The two arrays must be the same number of elements
 # (they represent COMBINATIONS of radius and height)
 CombinationsRadii = arr.array(
@@ -69,17 +74,17 @@ CombinationsHeights = arr.array(
 CombinationsMassFractions = arr.array(
     "d", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
 )
-CombinationDensities = arr.array("d", [0.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 3.2])
-TotalMass = 500.0
+CombinationDensities = arr.array("d", [1.0, 1.0, 1.0, 1.0, 3.2, 1.0, 1.0, 1.0, 3.2])
+TotalVolume = 30
 
 CombinationsFractions, CombinationsPopulations = number_ratio(
     CombinationsMassFractions,
     CombinationDensities,
     CombinationsHeights,
     CombinationsRadii,
-    TotalMass,
+    TotalVolume
 )
-CombinationsFractions = arr.array("d", CombinationsFractions)
+
 # CombinationsFractions = arr.array("d", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
 CombinationsCumSum = arr.array("d", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 CombinationRed = arr.array("d", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
@@ -163,8 +168,8 @@ def main():
 
                 bpy.ops.mesh.primitive_cylinder_add(
                     vertices=6,
-                    radius=GlobalScaleFactor * CombinationsRadii[LastI],
-                    depth=GlobalScaleFactor * CombinationsHeights[LastI],
+                    radius= CombinationsRadii[LastI],
+                    depth= CombinationsHeights[LastI],
                     enter_editmode=False,
                     location=(
                         (x - num_cubes_x / 2 + 0.5) * distance,
