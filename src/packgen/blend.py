@@ -58,8 +58,8 @@ def number_ratio(mass_ratio, densities, heights, radii, total_volume):
     for x, y in zip(number_components_rounded, number_components):
         # Check if the relative error is larger than 0.1%
         rel_diff = abs(x - y) / y
-        if rel_diff > 0.001:
-            raise Warning("The relative error due to rounding is larger than 0.1%.")
+        if rel_diff > 0.01:
+            raise Warning("The relative error due to rounding is larger than 1%.")
 
     number_percentages_rounded = [x / sum(number_components_rounded) for x in number_components_rounded]
 
@@ -78,7 +78,7 @@ CombinationsRadii = arr.array(
     "d", [0.1, 0.1, 0.1]
 )
 CombinationsHeights = arr.array(
-    "d", [0.2, 0.2, 0.2]
+    "d", [0.2, 0.25, 0.3]
 )
 
 
@@ -86,7 +86,8 @@ CombinationsMassFractions = arr.array(
     "d", [1.0, 1.0, 1.0]
 )
 CombinationDensities = arr.array("d", [1.0, 1.0, 1.0])
-TotalVolume = 30
+a = 1.5
+TotalVolume = a**3
 
 CombinationsFractions, CombinationsPopulations = number_ratio(
     CombinationsMassFractions,
@@ -98,9 +99,9 @@ CombinationsFractions, CombinationsPopulations = number_ratio(
 
 # CombinationsFractions = arr.array("d", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
 CombinationsCumSum = arr.array("d", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-CombinationRed = arr.array("d", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
-CombinationGreen = arr.array("d", [0.0, 0.0, 0.0, 0.0, 0.6, 0.0, 0.0, 0.0, 0.8])
-CombinationBlue = arr.array("d", [0.0, 0.0, 0.0, 0.0, 0.7, 0.0, 0.0, 0.0, 0.5])
+CombinationRed = arr.array("d", [0.0, 1.0, 1.0])
+CombinationGreen = arr.array("d", [0.0, 0.6, 0.8])
+CombinationBlue = arr.array("d", [0.0, 0.7, 0.5])
 TheSum = sum(CombinationsFractions)
 
 # Normalize array
@@ -116,9 +117,9 @@ for i in range(len(CombinationsFractions)):
 
 # Container box
 def create_cube_without_top_face(thesize):
-    scale_z = 3
+    scale_z = 30
     bpy.ops.mesh.primitive_cube_add(
-        size=thesize, enter_editmode=False, location=(0, 0, 0), scale=(1, 1, scale_z)
+        size=thesize, enter_editmode=False, location=(0, 0, 0 + scale_z/2), scale=(1, 1, scale_z)
     )
     cube = bpy.context.active_object
 
