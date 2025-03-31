@@ -147,8 +147,7 @@ def add_passive_rigidbody(cube):
     bpy.ops.rigidbody.object_add(type="PASSIVE")
     cube.rigid_body.collision_shape = "MESH"
 
-
-def main():
+def generate_cylinders_grid():
     # Customize the following parameters for your array of cubes
     num_cubes_x = 2  # Number of cubes along the X axis
     num_cubes_y = 2  # Number of cubes along the Y axis
@@ -218,9 +217,76 @@ def main():
                 if count == total_number:
                     break
 
+def generate_cylinders_random(N, a, cube_thickness):
+    # Customize the following parameters for your array of cubes
+    random.seed(42)  # Optional: set a seed for reproducible results
+
+    # Delete all existing mesh objects
+    bpy.ops.object.select_all(action="DESELECT")
+    bpy.ops.object.select_by_type(type="MESH")
+    bpy.ops.object.delete()
+
+    for n in range(N):
+        ThisRandomNumber = random.uniform(0.0, 1.0)
+        LastI = -1
+        for i in range(len(CombinationsFractions)):
+            if ThisRandomNumber > CombinationsCumSum[i]:
+                LastI = i
+        LastI = LastI + 1
+
+        max_height = max(CombinationsHeights)
+        max_radius = max(CombinationsRadii)
+        self_avoidance = np.sqrt(max_radius**2 + (max_height/2)**2)
+
+        # Generation square should be smaller than the cube so the cylinders do not touch the walls
+        generation_a = a - self_avoidance - cube_thickness
+
+        bpy.ops.mesh.primitive_cylinder_add(
+            vertices=6,
+            radius= CombinationsRadii[LastI],
+            depth= CombinationsHeights[LastI],
+            enter_editmode=False,
+            location=(
+                random.uniform(-generation_a, generation_a) / 2,
+                random.uniform(-generation_a, generation_a) / 2,
+                (n + 1) * self_avoidance,
+            ),
+        )
+
+        # Get the active object (the newly created cube)
+        cube = bpy.context.active_object
+
+        # Assign a random rotation to the cube
+        cube.rotation_euler = (
+            random.uniform(0, 6.283185),
+            random.uniform(0, 6.283185),
+            random.uniform(0, 6.283185),
+        )
+
+        # Add rigid body physics to the cube
+        bpy.ops.rigidbody.object_add(type="ACTIVE")
+        cube.rigid_body.friction = 0.5
+        cube.rigid_body.restitution = 0.5
+
+        mat = bpy.data.materials.new("PKHG")
+        mat.diffuse_color = (
+            float(CombinationRed[LastI]),
+            float(CombinationGreen[LastI]),
+            float(CombinationBlue[LastI]),
+            1.0,
+        )
+        mat.specular_intensity = 0
+
+        cube.active_material = mat
+
+def main():
+    print("total number", sum(CombinationsPopulations))
+    
     thickness = -0.2
 
-    cube = create_cube_without_top_face((num_cubes_x) * distance)
+    generate_cylinders_random(sum(CombinationsPopulations), a, np.abs(thickness))
+
+    cube = create_cube_without_top_face(a)
     add_solidify_modifier(cube, thickness)
 
     add_passive_rigidbody(cube)
