@@ -45,14 +45,25 @@ def number_ratio(mass_ratio, densities, heights, radii, total_volume):
 
     volume_components = volume_percentages * total_volume
 
-    # must round up or down to the nearest integer
     number_components = [
+        x / y for x, y in zip(volume_components, particle_volumes)
+    ]
+
+    # must round up or down to the nearest integer
+    number_components_rounded = [
         int(np.ceil(x / y)) for x, y in zip(volume_components, particle_volumes)
     ]
 
-    number_percentages = [x / sum(number_components) for x in number_components]
+    print(number_components_rounded, number_components)
+    for x, y in zip(number_components_rounded, number_components):
+        # Check if the relative error is larger than 0.1%
+        rel_diff = abs(x - y) / y
+        if rel_diff > 0.001:
+            raise Warning("The relative error due to rounding is larger than 0.1%.")
 
-    return number_percentages, number_components
+    number_percentages_rounded = [x / sum(number_components_rounded) for x in number_components_rounded]
+
+    return number_percentages_rounded, number_components_rounded
 
 
 # 1) Select "Scripting" workspace
@@ -64,17 +75,17 @@ def number_ratio(mass_ratio, densities, heights, radii, total_volume):
 # The two arrays must be the same number of elements
 # (they represent COMBINATIONS of radius and height)
 CombinationsRadii = arr.array(
-    "d", [0.0500, 0.0750, 0.1000, 0.1250, 0.1500, 0.1750, 0.2000, 0.2250, 0.2500]
+    "d", [0.1, 0.1, 0.1]
 )
 CombinationsHeights = arr.array(
-    "d", [0.0500, 0.0750, 0.1000, 0.1250, 0.1500, 0.1750, 0.2000, 0.2250, 0.2500]
+    "d", [0.2, 0.2, 0.2]
 )
 
 
 CombinationsMassFractions = arr.array(
-    "d", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    "d", [1.0, 1.0, 1.0]
 )
-CombinationDensities = arr.array("d", [1.0, 1.0, 1.0, 1.0, 3.2, 1.0, 1.0, 1.0, 3.2])
+CombinationDensities = arr.array("d", [1.0, 1.0, 1.0])
 TotalVolume = 30
 
 CombinationsFractions, CombinationsPopulations = number_ratio(
