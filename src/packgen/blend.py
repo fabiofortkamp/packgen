@@ -117,9 +117,9 @@ for i in range(len(CombinationsFractions)):
 
 # Container box
 def create_cube_without_top_face(thesize):
-    scale_z = 30
+    scale_z = 10
     bpy.ops.mesh.primitive_cube_add(
-        size=thesize, enter_editmode=False, location=(0, 0, 0 + scale_z/2), scale=(1, 1, scale_z)
+        size=thesize, enter_editmode=False, location=(0, 0, 0 + (scale_z*thesize)/2), scale=(1, 1, scale_z)
     )
     cube = bpy.context.active_object
 
