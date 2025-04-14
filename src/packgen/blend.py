@@ -20,51 +20,20 @@ def volume_prism(sides, radii, heights):
 
     return 1 / 2 * sides * np.square(radii) * np.sin(2 * np.pi / sides) * heights
 
-
 # Mass fractions
-def number_ratio(mass_ratio, densities, heights, radii, total_volume):
+def number_ratio(mass_ratio, densities, heights, radii):
     """
-    Calculate the number ratio of the materials in the mixture given the mass ratio, densities, volumes and total mass of the components.
+    Calculate the number ratio of the materials in the mixture given the mass ratio, densities and volumes of the components.
     """
 
     # Calculate the volumes of each particle
     particle_volumes = volume_prism([6] * len(radii), radii, heights)
 
-    # What percentage of the total mass is taken by each type of particle in the mixture?
-    mass_percentages = [x / sum(mass_ratio) for x in mass_ratio]
+    particle_masses = np.array(densities) * particle_volumes
 
-    sum_of_densities = sum([density for density, mass_ratio_i in zip(densities, mass_ratio) 
-                            if mass_ratio_i > 0
-                            ])
+    number_ratios = np.array(mass_ratio) / particle_masses
 
-    volume_ratios = [
-        x / (y / sum_of_densities) for x, y in zip(mass_percentages, densities)
-    ]
-
-    volume_percentages = np.array(volume_ratios) / sum(volume_ratios)
-
-    volume_components = volume_percentages * total_volume
-
-    number_components = [
-        x / y for x, y in zip(volume_components, particle_volumes)
-    ]
-
-    # must round up or down to the nearest integer
-    number_components_rounded = [
-        int(np.ceil(x / y)) for x, y in zip(volume_components, particle_volumes)
-    ]
-
-    print(number_components_rounded, number_components)
-    for x, y in zip(number_components_rounded, number_components):
-        # Check if the relative error is larger than 0.1%
-        rel_diff = abs(x - y) / y
-        if rel_diff > 0.01:
-            raise Warning("The relative error due to rounding is larger than 1%.")
-
-    number_percentages_rounded = [x / sum(number_components_rounded) for x in number_components_rounded]
-
-    return number_percentages_rounded, number_components_rounded
-
+    return number_ratios
 
 # 1) Select "Scripting" workspace
 # 2) In the "Text Editor" window, open this script and click "Run Script"
@@ -81,27 +50,23 @@ CombinationsHeights = arr.array(
     "d", [0.2, 0.25, 0.3]
 )
 
-
 CombinationsMassFractions = arr.array(
     "d", [1.0, 1.0, 1.0]
 )
 CombinationDensities = arr.array("d", [1.0, 1.0, 1.0])
 a = 1.5
-TotalVolume = a**3
 
-CombinationsFractions, CombinationsPopulations = number_ratio(
+CombinationsFractions = number_ratio(
     CombinationsMassFractions,
     CombinationDensities,
     CombinationsHeights,
-    CombinationsRadii,
-    TotalVolume
+    CombinationsRadii
 )
 
-# CombinationsFractions = arr.array("d", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
-CombinationsCumSum = arr.array("d", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-CombinationRed = arr.array("d", [0.0, 1.0, 1.0])
-CombinationGreen = arr.array("d", [0.0, 0.6, 0.8])
-CombinationBlue = arr.array("d", [0.0, 0.7, 0.5])
+CombinationsCumSum = arr.array("d", [0.0, 0.0, 0.0])
+CombinationRed = arr.array("d", [1.0, 1.0, 0.0])
+CombinationGreen = arr.array("d", [0.6, 0.8, 0.5])
+CombinationBlue = arr.array("d", [0.7, 0.5, 0.8])
 TheSum = sum(CombinationsFractions)
 
 # Normalize array
@@ -153,8 +118,7 @@ def generate_cylinders_grid():
     num_cubes_x = 2  # Number of cubes along the X axis
     num_cubes_y = 2  # Number of cubes along the Y axis
     num_cubes_z = 50  # Max number of   cubes along the Z axis
-    total_number = sum(CombinationsPopulations)
-
+    total_number = 100
     distance = 2.5  # Distance between the cubes
     mu = 0  # Mean of the log-normal distribution
     sigma = 0.1  # Standard deviation of the log-normal distribution
@@ -188,6 +152,8 @@ def generate_cylinders_grid():
                         z * distance,
                     ),
                 )
+
+                count = count + 1
 
                 # Get the active object (the newly created cube)
                 cube = bpy.context.active_object
@@ -281,11 +247,13 @@ def generate_cylinders_random(N, a, cube_thickness):
         cube.active_material = mat
 
 def main():
-    print("total number", sum(CombinationsPopulations))
-    
+
+    N = np.ceil(sum(CombinationsFractions))
+    print("total number", sum(CombinationsFractions), N)
+
     thickness = -0.2
 
-    generate_cylinders_random(sum(CombinationsPopulations), a, np.abs(thickness))
+    generate_cylinders_random(N, a, np.abs(thickness))
 
     cube = create_cube_without_top_face(a)
     add_solidify_modifier(cube, thickness)
