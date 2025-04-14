@@ -81,10 +81,10 @@ for i in range(len(CombinationsFractions)):
 
 
 # Container box
-def create_cube_without_top_face(thesize):
-    scale_z = 10
+def create_cube_without_top_face(thesize, cube_height):
+    scalez = cube_height / thesize
     bpy.ops.mesh.primitive_cube_add(
-        size=thesize, enter_editmode=False, location=(0, 0, 0 + (scale_z*thesize)/2), scale=(1, 1, scale_z)
+        size=thesize, enter_editmode=False, location=(0, 0, 0 + (cube_height)/2), scale=(1, 1, scalez)
     )
     cube = bpy.context.active_object
 
@@ -193,6 +193,8 @@ def generate_cylinders_random(N, a, cube_thickness):
     bpy.ops.object.select_by_type(type="MESH")
     bpy.ops.object.delete()
 
+    height = 0.0
+
     for n in range(N):
         ThisRandomNumber = random.uniform(0.0, 1.0)
         LastI = -1
@@ -220,6 +222,8 @@ def generate_cylinders_random(N, a, cube_thickness):
             ),
         )
 
+        height += self_avoidance
+
         # Get the active object (the newly created cube)
         cube = bpy.context.active_object
 
@@ -246,16 +250,17 @@ def generate_cylinders_random(N, a, cube_thickness):
 
         cube.active_material = mat
 
+    return height
+
 def main():
 
-    N = np.ceil(sum(CombinationsFractions))
-    print("total number", sum(CombinationsFractions), N)
+    print("total number", TheSum)
 
     thickness = -0.2
 
-    generate_cylinders_random(N, a, np.abs(thickness))
+    stack_height = generate_cylinders_random(int(TheSum), a, np.abs(thickness))
 
-    cube = create_cube_without_top_face(a)
+    cube = create_cube_without_top_face(a, stack_height)
     add_solidify_modifier(cube, thickness)
 
     add_passive_rigidbody(cube)
