@@ -1,7 +1,8 @@
-# Script by Andrea Insinga
+"""Run packing simulation in Blender.
 
-# this enables testing the top-level functions
-# in environments without Blender
+Original design and implementation by Andrea Insinga.
+"""
+
 try:
     import bpy
 except ImportError:
@@ -21,6 +22,7 @@ def volume_prism(sides, radii, heights):
 
     return 1 / 2 * sides * np.square(radii) * np.sin(2 * np.pi / sides) * heights
 
+
 # Mass fractions
 def number_ratio(mass_ratio, densities, heights, radii):
     """
@@ -32,21 +34,24 @@ def number_ratio(mass_ratio, densities, heights, radii):
 
     particle_masses = np.array(densities) * particle_volumes
 
-    number_ratios = np.array(mass_ratio) / particle_masses  
+    number_ratios = np.array(mass_ratio) / particle_masses
 
     number_ratios_rounded = np.ceil(number_ratios)
 
     mass_ratios_rounded = number_ratios_rounded * particle_masses
 
-    relative_mass_error = np.abs(
-        mass_ratios_rounded - np.array(mass_ratio)
-    ) / np.array(mass_ratio)
+    relative_mass_error = np.abs(mass_ratios_rounded - np.array(mass_ratio)) / np.array(
+        mass_ratio
+    )
 
     for error in relative_mass_error:
         if error > 0.01:
-            raise Warning("The relative error in mass ratios due to rounding is larger than 1%.")
+            raise Warning(
+                "The relative error in mass ratios due to rounding is larger than 1%."
+            )
 
     return number_ratios
+
 
 # 1) Select "Scripting" workspace
 # 2) In the "Text Editor" window, open this script and click "Run Script"
@@ -56,16 +61,10 @@ def number_ratio(mass_ratio, densities, heights, radii):
 
 # The two arrays must be the same number of elements
 # (they represent COMBINATIONS of radius and height)
-CombinationsRadii = arr.array(
-    "d", [0.1, 0.1, 0.1]
-)
-CombinationsHeights = arr.array(
-    "d", [0.2, 0.25, 0.3]
-)
+CombinationsRadii = arr.array("d", [0.1, 0.1, 0.1])
+CombinationsHeights = arr.array("d", [0.2, 0.25, 0.3])
 
-CombinationsMassFractions = arr.array(
-    "d", [1.0, 1.0, 1.0]
-)
+CombinationsMassFractions = arr.array("d", [1.0, 1.0, 1.0])
 CombinationDensities = arr.array("d", [1.0, 1.0, 1.0])
 a = 1.5
 
@@ -73,7 +72,7 @@ CombinationsFractions = number_ratio(
     CombinationsMassFractions,
     CombinationDensities,
     CombinationsHeights,
-    CombinationsRadii
+    CombinationsRadii,
 )
 
 CombinationsCumSum = arr.array("d", [0.0, 0.0, 0.0])
@@ -97,7 +96,10 @@ for i in range(len(CombinationsFractions)):
 def create_cube_without_top_face(thesize, cube_height):
     scalez = cube_height / thesize
     bpy.ops.mesh.primitive_cube_add(
-        size=thesize, enter_editmode=False, location=(0, 0, 0 + (cube_height)/2), scale=(1, 1, scalez)
+        size=thesize,
+        enter_editmode=False,
+        location=(0, 0, 0 + (cube_height) / 2),
+        scale=(1, 1, scalez),
     )
     cube = bpy.context.active_object
 
@@ -125,6 +127,7 @@ def add_solidify_modifier(cube, thickness):
 def add_passive_rigidbody(cube):
     bpy.ops.rigidbody.object_add(type="PASSIVE")
     cube.rigid_body.collision_shape = "MESH"
+
 
 def generate_cylinders_grid():
     # Customize the following parameters for your array of cubes
@@ -156,8 +159,8 @@ def generate_cylinders_grid():
 
                 bpy.ops.mesh.primitive_cylinder_add(
                     vertices=6,
-                    radius= CombinationsRadii[LastI],
-                    depth= CombinationsHeights[LastI],
+                    radius=CombinationsRadii[LastI],
+                    depth=CombinationsHeights[LastI],
                     enter_editmode=False,
                     location=(
                         (x - num_cubes_x / 2 + 0.5) * distance,
@@ -197,6 +200,7 @@ def generate_cylinders_grid():
                 if count == total_number:
                     break
 
+
 def generate_cylinders_random(N, a, cube_thickness):
     # Customize the following parameters for your array of cubes
     random.seed(42)  # Optional: set a seed for reproducible results
@@ -218,15 +222,15 @@ def generate_cylinders_random(N, a, cube_thickness):
 
         max_height = max(CombinationsHeights)
         max_radius = max(CombinationsRadii)
-        self_avoidance = np.sqrt(max_radius**2 + (max_height/2)**2)
+        self_avoidance = np.sqrt(max_radius**2 + (max_height / 2) ** 2)
 
         # Generation square should be smaller than the cube so the cylinders do not touch the walls
         generation_a = a - self_avoidance - cube_thickness
 
         bpy.ops.mesh.primitive_cylinder_add(
             vertices=6,
-            radius= CombinationsRadii[LastI],
-            depth= CombinationsHeights[LastI],
+            radius=CombinationsRadii[LastI],
+            depth=CombinationsHeights[LastI],
             enter_editmode=False,
             location=(
                 random.uniform(-generation_a, generation_a) / 2,
@@ -265,8 +269,8 @@ def generate_cylinders_random(N, a, cube_thickness):
 
     return height
 
-def main():
 
+def main():
     print("total number", TheSum)
 
     thickness = -0.2
@@ -278,13 +282,12 @@ def main():
 
     add_passive_rigidbody(cube)
 
-
     def export_stl():
         stl_path = os.path.join(os.path.expanduser("~"), "packgen_result.stl")
 
         print("Exporting to", stl_path)
         bpy.ops.wm.stl_export(filepath=stl_path)
-        
+
     def stop_playback(scene):
         if scene.frame_current == 200:
             bpy.ops.screen.animation_cancel(restore_frame=False)
@@ -294,6 +297,7 @@ def main():
     bpy.app.handlers.frame_change_pre.append(stop_playback)
 
     bpy.ops.screen.animation_play()
+
 
 if __name__ == "__main__":
     main()
