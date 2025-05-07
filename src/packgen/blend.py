@@ -80,13 +80,16 @@ def num_non_aligned_particles(
 
 
 parameters = load_parameters()
-
 GlobalScaleFactor = parameters["scale"]
+
+# convention for indices for the "aligned" and "non-aligned" particles
+I_NON_ALIGNED = 1
+
 CombinationsRadii = arr.array(
-    "d", [parameters["r_non_aligned"], parameters["r_aligned"]]
+    "d", [parameters["r_aligned"], parameters["r_non_aligned"]]
 )
 CombinationsHeights = arr.array(
-    "d", [parameters["thickness_non_aligned"], parameters["thickness_aligned"]]
+    "d", [parameters["thickness_aligned"], parameters["thickness_non_aligned"]]
 )
 
 num_cubes_x = parameters["num_cubes_x"]  # Number of cubes along the X axis
@@ -98,8 +101,6 @@ number_fraction_non_aligned = num_cubes_non_aligned / num_cubes_total
 distance = parameters["distance"]  # Distance between the cubes
 seed = parameters["seed"]
 
-# convention for indices for the "aligned" and "non-aligned" particles
-I_NON_ALIGNED = 1
 z0 = distance / 2
 CombinationsFractions = arr.array(
     "d", [1.0 - number_fraction_non_aligned, number_fraction_non_aligned]
