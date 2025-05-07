@@ -8,6 +8,7 @@ import json
 import math
 import random
 import sys
+from pathlib import Path
 
 import bpy
 import numpy as np
@@ -246,8 +247,17 @@ add_solidify_modifier(cube, thickness)
 add_passive_rigidbody(cube)
 
 
+def get_params_suffix() -> str:
+    """Get the base name of the parameters file without extension to use as a suffix.
+
+    Returns:
+        str: The base name of the parameters file without extension.
+    """
+    return Path(parameters_file).stem
+
+
 def export_stl():
-    stl_path = "packing.stl"
+    stl_path = f"packing_{get_params_suffix()}.stl"
 
     print("Exporting to", stl_path)
     bpy.ops.wm.stl_export(filepath=stl_path)
@@ -255,7 +265,7 @@ def export_stl():
 
 def stop_playback(scene):
     if scene.frame_current == 230:
-        bpy.ops.wm.save_mainfile(filepath="packing.blender")
+        bpy.ops.wm.save_mainfile(filepath=f"packing_{get_params_suffix()}.blender")
         bpy.ops.screen.animation_cancel(restore_frame=False)
         bpy.ops.object.delete(use_global=False)
         export_stl()
