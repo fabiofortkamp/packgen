@@ -4,11 +4,31 @@ Original design and implementation by Andrea Insinga.
 """
 
 import array as arr
-import random
 import json
+import math
+import random
+
 import bpy
 import numpy as np
 from numpy.typing import ArrayLike
+
+
+def load_parameters(parameters_file: str = "parameters.json") -> dict[str, float]:
+    """Load parameters from a JSON file.
+
+    Args:
+        parameters_file (str): Path to the parameters file.
+            Defaults to "parameters.json".
+
+    Returns:
+        dict[str, float]: The loaded parameters mapping strings to float values.
+            If 'seed' is null in the JSON, it will be converted to a random float.
+    """
+    with open(parameters_file) as f:
+        params = json.load(f)
+        if params.get("seed") is None:
+            params["seed"] = random.random() * 1e6
+        return params
 
 
 def volume_prism(sides: ArrayLike, radii: ArrayLike, heights: ArrayLike) -> ArrayLike:
@@ -24,22 +44,61 @@ def volume_prism(sides: ArrayLike, radii: ArrayLike, heights: ArrayLike) -> Arra
     return 1 / 2 * sides * np.square(radii) * np.sin(2 * np.pi / sides) * heights
 
 
-parameters_file = "parameters.json"
-with open(parameters_file) as f:
-    parameters = json.load(f)
+def num_non_aligned_particles(
+    parameters: dict[str, float], num_particles_total: int
+) -> int:
+    """Return the total number of non-aligned particles.
 
-GlobalScaleFactor = 2.5
-CombinationsRadii = arr.array("d", [0.200 / 2, 0.059 / 2])
-CombinationsHeights = arr.array("d", [0.0871, 0.027])
-number_fraction_non_aligned = parameters["number_fraction_non_aligned"]
-num_cubes_x = 2  # Number of cubes along the X axis
-num_cubes_y = 2  # Number of cubes along the Y axis
-num_cubes_z = 100  # Number of   cubes along the Z axis
-distance = 1.5  # Distance between the cubes
-seed = 42
+    Args:
+        parameters (dict[str, float]): The parameters of the packing simulation.
+        num_particles_total (int): The total number of particles to be generated.
+
+    Returns:
+        int: The total number of non-aligned particles.
+    """
+    rho_NA = parameters["density_non_aligned"]
+    rho_A = parameters["density_aligned"]
+
+    r_NA = parameters["r_non_aligned"]
+    r_A = parameters["r_aligned"]
+
+    h_NA = parameters["thickness_non_aligned"]
+    h_A = parameters["thickness_aligned"]
+
+    volumes = volume_prism([6, 6], [r_NA, r_A], [h_NA, h_A])
+    V_NA = volumes[0]
+    V_A = volumes[1]
+
+    beta = rho_NA * V_NA / (rho_A * V_A)
+
+    x_NA = parameters["mass_fraction_non_aligned"]
+    alpha = 1 / beta * (x_NA / (1 - x_NA))
+
+    N_NA = alpha / (1 + alpha) * num_particles_total
+
+    return math.ceil(N_NA)
+
+
+parameters = load_parameters()
+
+GlobalScaleFactor = parameters["scale"]
+CombinationsRadii = arr.array(
+    "d", [parameters["r_non_aligned"], parameters["r_aligned"]]
+)
+CombinationsHeights = arr.array(
+    "d", [parameters["thickness_non_aligned"], parameters["thickness_aligned"]]
+)
+
+num_cubes_x = parameters["num_cubes_x"]  # Number of cubes along the X axis
+num_cubes_y = parameters["num_cubes_y"]  # Number of cubes along the Y axis
+num_cubes_z = parameters["num_cubes_z"]  # Number of cubes along the Z axis
+num_cubes_total = num_cubes_x * num_cubes_y * num_cubes_z
+num_cubes_non_aligned = num_non_aligned_particles(parameters, num_cubes_total)
+number_fraction_non_aligned = num_cubes_non_aligned / num_cubes_total
+distance = parameters["distance"]  # Distance between the cubes
+seed = parameters["seed"]
 
 # convention for indices for the "aligned" and "non-aligned" particles
-I_ALIGNED = 0
 I_NON_ALIGNED = 1
 z0 = distance / 2
 CombinationsFractions = arr.array(
@@ -49,10 +108,6 @@ CombinationsCumSum = arr.array("d", [0.0, 0.0])
 CombinationRed = arr.array("d", [0.1, 0.8])
 CombinationGreen = arr.array("d", [0.8, 0.4])
 CombinationBlue = arr.array("d", [0.7, 0.7])
-
-num_cubes_total = num_cubes_x * num_cubes_y * num_cubes_z
-num_cubes_non_aligned = round(number_fraction_non_aligned * num_cubes_total)
-num_cubes_aligned = num_cubes_total - num_cubes_non_aligned
 
 random.seed(seed)  # Optional: set a seed for reproducible results
 TheSum = sum(CombinationsFractions)
