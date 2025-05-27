@@ -1,7 +1,7 @@
 import os.path
-from pathlib import Path
 import platform
 import subprocess
+from pathlib import Path
 
 PROJECT_PATH = Path(__file__).parent
 BLENDER_SCRIPT = PROJECT_PATH / "blend.py"
