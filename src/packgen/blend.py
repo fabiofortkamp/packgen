@@ -12,7 +12,6 @@ from pathlib import Path
 
 import bpy
 import numpy as np
-from numpy.typing import ArrayLike
 
 
 def get_parameters_file() -> str:
@@ -43,17 +42,13 @@ def load_parameters(parameters_file: str = "parameters.json") -> dict[str, float
         return params
 
 
-def volume_prism(sides: ArrayLike, radii: ArrayLike, heights: ArrayLike) -> ArrayLike:
+def volume_prism(sides: float, radius: float, height: float) -> float:
     """Return the volume of a prism with given number of sides, radius, and height.
 
     References:
         https://en.wikipedia.org/wiki/Regular_polygon
     """
-    sides = np.array(sides)
-    radii = np.array(radii)
-    heights = np.array(heights)
-
-    return 1 / 2 * sides * np.square(radii) * np.sin(2 * np.pi / sides) * heights
+    return 1 / 2 * sides * np.square(radius) * np.sin(2 * np.pi / sides) * height
 
 
 def num_non_aligned_particles(
@@ -77,9 +72,8 @@ def num_non_aligned_particles(
     h_NA = parameters["thickness_non_aligned"]
     h_A = parameters["thickness_aligned"]
 
-    volumes = volume_prism([6, 6], [r_NA, r_A], [h_NA, h_A])
-    V_NA = volumes[0]
-    V_A = volumes[1]
+    V_NA = volume_prism(6, r_NA, h_NA)
+    V_A = volume_prism(6, r_A, h_A)
 
     beta = rho_NA * V_NA / (rho_A * V_A)
 
