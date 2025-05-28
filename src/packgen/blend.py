@@ -1,5 +1,16 @@
 """Run packing simulation in Blender.
 
+This script reads parameters from a file passed on the
+command line, or "parameters.json" by default, and
+simulates particles falling due to the gravitational field
+inside a container box.
+
+There are two types of particles, "A" and "B". The particles are assumed to be
+prismatic, with the polygonal faces characterized by a circumscribed radius,
+and the prism having a given height. The parameters file describes these
+geometric parameters, together with the densities of the particles.
+The container configuration is also included.
+
 Original design and implementation by Andrea Insinga.
 """
 
@@ -51,66 +62,57 @@ def volume_prism(sides: float, radius: float, height: float) -> float:
     return 1 / 2 * sides * np.square(radius) * np.sin(2 * np.pi / sides) * height
 
 
-def num_non_aligned_particles(
-    parameters: dict[str, float], num_particles_total: int
-) -> int:
-    """Return the total number of non-aligned particles.
+def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> int:
+    """Return the total number of type-B particles to be generated.
 
     Args:
         parameters (dict[str, float]): The parameters of the packing simulation.
         num_particles_total (int): The total number of particles to be generated.
-
-    Returns:
-        int: The total number of non-aligned particles.
     """
-    rho_NA = parameters["density_non_aligned"]
-    rho_A = parameters["density_aligned"]
+    rho_B = parameters["density_B"]
+    rho_A = parameters["density_A"]
 
-    r_NA = parameters["r_non_aligned"]
-    r_A = parameters["r_aligned"]
+    r_B = parameters["r_B"]
+    r_A = parameters["r_A"]
 
-    h_NA = parameters["thickness_non_aligned"]
-    h_A = parameters["thickness_aligned"]
+    h_B = parameters["thickness_B"]
+    h_A = parameters["thickness_A"]
 
-    V_NA = volume_prism(6, r_NA, h_NA)
+    V_B = volume_prism(6, r_B, h_B)
     V_A = volume_prism(6, r_A, h_A)
 
-    beta = rho_NA * V_NA / (rho_A * V_A)
+    beta = rho_B * V_B / (rho_A * V_A)
 
-    x_NA = parameters["mass_fraction_non_aligned"]
-    alpha = 1 / beta * (x_NA / (1 - x_NA))
+    x_B = parameters["mass_fraction_B"]
+    alpha = 1 / beta * (x_B / (1 - x_B))
 
-    N_NA = alpha / (1 + alpha) * num_particles_total
+    N_B = alpha / (1 + alpha) * num_particles_total
 
-    return math.ceil(N_NA)
+    return math.ceil(N_B)
 
 
 parameters = load_parameters(get_parameters_file())
 GlobalScaleFactor = parameters["scale"]
 
-# convention for indices for the "aligned" and "non-aligned" particles
-I_NON_ALIGNED = 1
+# convention for indices for the "A" and "non-A" particles
+I_B = 1
 
-CombinationsRadii = arr.array(
-    "d", [parameters["r_aligned"], parameters["r_non_aligned"]]
-)
+CombinationsRadii = arr.array("d", [parameters["r_A"], parameters["r_B"]])
 CombinationsHeights = arr.array(
-    "d", [parameters["thickness_aligned"], parameters["thickness_non_aligned"]]
+    "d", [parameters["thickness_A"], parameters["thickness_B"]]
 )
 
 num_cubes_x = parameters["num_cubes_x"]  # Number of cubes along the X axis
 num_cubes_y = parameters["num_cubes_y"]  # Number of cubes along the Y axis
 num_cubes_z = parameters["num_cubes_z"]  # Number of cubes along the Z axis
 num_cubes_total = num_cubes_x * num_cubes_y * num_cubes_z
-num_cubes_non_aligned = num_non_aligned_particles(parameters, num_cubes_total)
-number_fraction_non_aligned = num_cubes_non_aligned / num_cubes_total
+num_cubes_B = num_B_particles(parameters, num_cubes_total)
+number_fraction_B = num_cubes_B / num_cubes_total
 distance = parameters["distance"]  # Distance between the cubes
 seed = parameters["seed"]
 
 z0 = distance / 2
-CombinationsFractions = arr.array(
-    "d", [1.0 - number_fraction_non_aligned, number_fraction_non_aligned]
-)
+CombinationsFractions = arr.array("d", [1.0 - number_fraction_B, number_fraction_B])
 CombinationsCumSum = arr.array("d", [0.0, 0.0])
 CombinationRed = arr.array("d", [0.1, 0.8])
 CombinationGreen = arr.array("d", [0.8, 0.4])
@@ -172,7 +174,7 @@ bpy.ops.object.select_by_type(type="MESH")
 bpy.ops.object.delete()
 
 
-def decide_cube(n_non_aligned: int, n_aligned: int) -> int:
+def decide_cube(n_B: int, n_A: int) -> int:
     """Decide which cube type to generate, based on how many were generated."""
     ThisRandomNumber = random.uniform(0.0, 1.0)
     LastI = -1
@@ -184,19 +186,17 @@ def decide_cube(n_non_aligned: int, n_aligned: int) -> int:
 
 
 # Create an array of cubes with random sizes determined by the log-normal distribution
-n_generated_cubes_non_aligned = 0
-n_generated_cubed_aligned = 0
+n_generated_cubes_B = 0
+n_generated_cubed_A = 0
 for x in range(num_cubes_x):
     for y in range(num_cubes_y):
         for z in range(num_cubes_z):
-            LastI = decide_cube(
-                n_generated_cubes_non_aligned, n_generated_cubed_aligned
-            )
+            LastI = decide_cube(n_generated_cubes_B, n_generated_cubed_A)
 
-            if LastI == I_NON_ALIGNED:
-                n_generated_cubes_non_aligned += 1
+            if LastI == I_B:
+                n_generated_cubes_B += 1
             else:
-                n_generated_cubed_aligned += 1
+                n_generated_cubed_A += 1
 
             bpy.ops.mesh.primitive_cylinder_add(
                 vertices=6,
@@ -250,7 +250,7 @@ def get_params_suffix() -> str:
     Returns:
         str: The base name of the parameters file without extension.
     """
-    return Path(parameters_file).stem
+    return Path(get_parameters_file()).stem
 
 
 def export_stl():
