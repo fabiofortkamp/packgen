@@ -14,12 +14,15 @@ import bpy
 import numpy as np
 from numpy.typing import ArrayLike
 
-if "--" in sys.argv:
-    argv = sys.argv[sys.argv.index("--") + 1 :]  # get all args after "--"
-    parameters_file = argv[0]
-else:
-    argv = sys.argv  # use all args if no "--" found
-    parameters_file = "parameters.json"
+
+def get_parameters_file() -> str:
+    """Parse argument lists and return parameters file name."""
+    if "--" in sys.argv:
+        argv = sys.argv[sys.argv.index("--") + 1 :]  # get all args after "--"
+        parameters_file = argv[0]
+    else:
+        parameters_file = "parameters.json"
+    return parameters_file
 
 
 def load_parameters(parameters_file: str = "parameters.json") -> dict[str, float]:
@@ -88,7 +91,7 @@ def num_non_aligned_particles(
     return math.ceil(N_NA)
 
 
-parameters = load_parameters(parameters_file)
+parameters = load_parameters(get_parameters_file())
 GlobalScaleFactor = parameters["scale"]
 
 # convention for indices for the "aligned" and "non-aligned" particles
