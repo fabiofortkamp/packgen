@@ -93,19 +93,17 @@ def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> i
 
 
 parameters = load_parameters(get_parameters_file())
-GlobalScaleFactor = parameters["scale"]
+scale = parameters["scale"]
 
 # convention for indices for the "A" and "non-A" particles
 I_B = 1
 
-CombinationsRadii = arr.array("d", [parameters["r_A"], parameters["r_B"]])
-CombinationsHeights = arr.array(
-    "d", [parameters["thickness_A"], parameters["thickness_B"]]
-)
+radii = arr.array("d", [parameters["r_A"], parameters["r_B"]])
+heights = arr.array("d", [parameters["thickness_A"], parameters["thickness_B"]])
 
-num_cubes_x = parameters["num_cubes_x"]  # Number of cubes along the X axis
-num_cubes_y = parameters["num_cubes_y"]  # Number of cubes along the Y axis
-num_cubes_z = parameters["num_cubes_z"]  # Number of cubes along the Z axis
+num_cubes_x = int(parameters["num_cubes_x"])  # Number of cubes along the X axis
+num_cubes_y = int(parameters["num_cubes_y"])  # Number of cubes along the Y axis
+num_cubes_z = int(parameters["num_cubes_z"])  # Number of cubes along the Z axis
 num_cubes_total = num_cubes_x * num_cubes_y * num_cubes_z
 num_cubes_B = num_B_particles(parameters, num_cubes_total)
 number_fraction_B = num_cubes_B / num_cubes_total
@@ -113,24 +111,24 @@ distance = parameters["distance"]  # Distance between the cubes
 seed = parameters["seed"]
 
 z0 = distance / 2
-CombinationsFractions = arr.array("d", [1.0 - number_fraction_B, number_fraction_B])
-CombinationsCumSum = arr.array("d", [0.0, 0.0])
+number_fractions = arr.array("d", [1.0 - number_fraction_B, number_fraction_B])
+cum_sums = arr.array("d", [0.0, 0.0])
 CombinationRed = arr.array("d", [0.1, 0.8])
 CombinationGreen = arr.array("d", [0.8, 0.4])
 CombinationBlue = arr.array("d", [0.7, 0.7])
 
 random.seed(seed)  # Optional: set a seed for reproducible results
-TheSum = sum(CombinationsFractions)
+the_sum = sum(number_fractions)
 
 # Normalize array
-for i in range(len(CombinationsFractions)):
-    CombinationsFractions[i] = CombinationsFractions[i] / TheSum
+for i in range(len(number_fractions)):
+    number_fractions[i] = number_fractions[i] / the_sum
 
 # Cumulative Sum
-CumulativeSum = 0.0
-for i in range(len(CombinationsFractions)):
-    CumulativeSum = CumulativeSum + CombinationsFractions[i]
-    CombinationsCumSum[i] = CumulativeSum
+cum_sum = 0.0
+for i in range(len(number_fractions)):
+    cum_sum = cum_sum + number_fractions[i]
+    cum_sums[i] = cum_sum
 
 
 def create_cube_without_top_face(side: float, height: float):
@@ -179,8 +177,8 @@ def decide_cube(n_B: int, n_A: int) -> int:
     """Decide which cube type to generate, based on how many were generated."""
     ThisRandomNumber = random.uniform(0.0, 1.0)
     LastI = -1
-    for i in range(len(CombinationsFractions)):
-        if ThisRandomNumber > CombinationsCumSum[i]:
+    for i in range(len(number_fractions)):
+        if ThisRandomNumber > cum_sums[i]:
             LastI = i
     LastI = LastI + 1
     return LastI
@@ -202,8 +200,8 @@ for x in range(num_cubes_x):
 
             bpy.ops.mesh.primitive_cylinder_add(
                 vertices=n_sides,
-                radius=GlobalScaleFactor * CombinationsRadii[LastI],
-                depth=GlobalScaleFactor * CombinationsHeights[LastI],
+                radius=scale * radii[LastI],
+                depth=scale * heights[LastI],
                 enter_editmode=False,
                 location=(
                     (x - num_cubes_x / 2 + 0.5) * distance,
