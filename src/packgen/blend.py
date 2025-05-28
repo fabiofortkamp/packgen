@@ -78,8 +78,9 @@ def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> i
     h_B = parameters["thickness_B"]
     h_A = parameters["thickness_A"]
 
-    V_B = volume_prism(6, r_B, h_B)
-    V_A = volume_prism(6, r_A, h_A)
+    n_sides = int(parameters["num_sides"])
+    V_B = volume_prism(n_sides, r_B, h_B)
+    V_A = volume_prism(n_sides, r_A, h_A)
 
     beta = rho_B * V_B / (rho_A * V_A)
 
@@ -185,6 +186,7 @@ def decide_cube(n_B: int, n_A: int) -> int:
     return LastI
 
 
+n_sides = parameters["num_sides"]
 # Create an array of cubes with random sizes determined by the log-normal distribution
 n_generated_cubes_B = 0
 n_generated_cubed_A = 0
@@ -199,7 +201,7 @@ for x in range(num_cubes_x):
                 n_generated_cubed_A += 1
 
             bpy.ops.mesh.primitive_cylinder_add(
-                vertices=6,
+                vertices=n_sides,
                 radius=GlobalScaleFactor * CombinationsRadii[LastI],
                 depth=GlobalScaleFactor * CombinationsHeights[LastI],
                 enter_editmode=False,

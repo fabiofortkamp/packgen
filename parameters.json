@@ -11,5 +11,6 @@
     "num_cubes_x": 2,
     "num_cubes_y": 2,
     "num_cubes_z": 100,
+    "num_sides": 6,
     "distance": 1.5
 }
