@@ -2,6 +2,7 @@ import os.path
 import platform
 import subprocess
 from pathlib import Path
+import sys
 
 PROJECT_PATH = Path(__file__).parent
 BLENDER_SCRIPT = PROJECT_PATH / "blend.py"
@@ -29,5 +30,8 @@ def find_Blender_executable() -> str:
 
 def main() -> None:
     executable = find_Blender_executable()
-    args = [executable, BLENDER_SCRIPT_FLAG, str(BLENDER_SCRIPT)]
+    cmd_args = []
+    if "--" in sys.argv:
+        cmd_args = sys.argv[sys.argv.index("--") :]  # get all args after "--"
+    args = [executable, BLENDER_SCRIPT_FLAG, str(BLENDER_SCRIPT)] + cmd_args
     _ = subprocess.run(args)
