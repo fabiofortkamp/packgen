@@ -1,6 +1,6 @@
 [project]
 name = "packgen"
-version = "0.1.0"
+version = "0.2.0-alpha1"
 description = "Particle packing generator"
 readme = "README.md"
 authors = [
@@ -8,8 +8,9 @@ authors = [
     { name = "Andrea R. Insinga", email = "aroin@dtu.dk" },
     { name = "Andreas Papanikolaou", email = "" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.11, <3.12"
 dependencies = [
+    "bpy>=4.4.0",
     "numpy>=2.2.3",
     "rich>=13.9.4",
 ]
@@ -26,4 +27,8 @@ build-backend = "hatchling.build"
 dev = [
     "pytest>=8.3.5",
 ]
+
+[tool.basedpyright]
+typeCheckingMode = "basic"
+allowedUntypedLibraries = ["bpy"]
 

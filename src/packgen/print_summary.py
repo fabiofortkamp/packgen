@@ -1,11 +1,11 @@
 """Print summary of the mass fraction calculations."""
 
-from packgen.blend import number_ratio, volume_prism
-
 from dataclasses import dataclass
 
 from rich import print
 from rich.table import Table
+
+from packgen.blend import number_ratio, volume_prism
 
 type ParticlesValues = tuple[float, float]
 

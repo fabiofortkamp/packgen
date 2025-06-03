@@ -1,5 +1,6 @@
+from math import isclose, sqrt
+
 from packgen import blend
-from math import sqrt, isclose
 
 
 def test_volume_prism_coincides_with_hexagon():

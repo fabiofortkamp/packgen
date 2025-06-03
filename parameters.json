@@ -1,0 +1,15 @@
+{
+    "seed": 42,
+    "scale": 2.5,
+    "r_non_aligned": 0.0295,
+    "r_aligned": 0.1,
+    "thickness_non_aligned": 0.027,
+    "thickness_aligned": 0.0871,
+    "density_non_aligned": 15.1,
+    "density_aligned": 5.1,
+    "mass_fraction_non_aligned": 0,
+    "num_cubes_x": 2,
+    "num_cubes_y": 2,
+    "num_cubes_z": 100,
+    "distance": 1.5
+}

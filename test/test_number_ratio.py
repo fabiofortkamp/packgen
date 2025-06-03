@@ -1,11 +1,13 @@
-import sys
 import os
+import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from packgen import blend
-from math import isclose
 import array as arr
+from math import isclose
+
+from packgen import blend
+
 
 def test_number_ratio_same_density_and_geometry():
     """Check the resulting number ratio is the same as the mass ratio."""
