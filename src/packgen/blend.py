@@ -92,6 +92,38 @@ def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> i
     return math.ceil(N_B)
 
 
+def create_container_without_top_face(side: float, height: float, thickness: float):
+    height_to_side_scale = height / side
+    bpy.ops.mesh.primitive_cube_add(
+        size=side,
+        enter_editmode=False,
+        location=(0, 0, height / 2),
+        scale=(1, 1, height_to_side_scale),
+    )
+    cube = bpy.context.active_object
+
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="DESELECT")
+    bpy.ops.mesh.select_mode(type="FACE")
+
+    bpy.ops.object.mode_set(mode="OBJECT")
+    top_face = [face for face in cube.data.polygons if face.normal.z > 0.9]
+    for face in top_face:
+        face.select = True
+
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.delete(type="FACE")
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    modifier = cube.modifiers.new(name="Solidify", type="SOLIDIFY")
+    modifier.thickness = thickness
+
+    bpy.ops.rigidbody.object_add(type="PASSIVE")
+    cube.rigid_body.collision_shape = "MESH"
+
+    return cube
+
+
 parameters = load_parameters(get_parameters_file())
 scale = parameters["scale"]
 
@@ -129,42 +161,6 @@ cum_sum = 0.0
 for i in range(len(number_fractions)):
     cum_sum = cum_sum + number_fractions[i]
     cum_sums[i] = cum_sum
-
-
-def create_cube_without_top_face(side: float, height: float):
-    height_to_side_scale = height / side
-    bpy.ops.mesh.primitive_cube_add(
-        size=side,
-        enter_editmode=False,
-        location=(0, 0, height / 2),
-        scale=(1, 1, height_to_side_scale),
-    )
-    cube = bpy.context.active_object
-
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="DESELECT")
-    bpy.ops.mesh.select_mode(type="FACE")
-
-    bpy.ops.object.mode_set(mode="OBJECT")
-    top_face = [face for face in cube.data.polygons if face.normal.z > 0.9]
-    for face in top_face:
-        face.select = True
-
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.delete(type="FACE")
-    bpy.ops.object.mode_set(mode="OBJECT")
-
-    return cube
-
-
-def add_solidify_modifier(cube, thickness):
-    modifier = cube.modifiers.new(name="Solidify", type="SOLIDIFY")
-    modifier.thickness = thickness
-
-
-def add_passive_rigidbody(cube):
-    bpy.ops.rigidbody.object_add(type="PASSIVE")
-    cube.rigid_body.collision_shape = "MESH"
 
 
 # Delete all existing mesh objects
@@ -238,10 +234,9 @@ for x in range(num_cubes_x):
 
 thickness = -0.2
 
-cube = create_cube_without_top_face((num_cubes_x) * distance, num_cubes_z * distance)
-add_solidify_modifier(cube, thickness)
-
-add_passive_rigidbody(cube)
+cube = create_container_without_top_face(
+    (num_cubes_x) * distance, num_cubes_z * distance, thickness
+)
 
 
 def get_params_suffix() -> str:
