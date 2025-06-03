@@ -146,6 +146,7 @@ def stop_playback(scene):
         bpy.ops.screen.animation_cancel(restore_frame=False)
         bpy.ops.object.delete(use_global=False)
         export_stl()
+        bpy.ops.wm.quit_blender()
 
 
 def decide_cube(n_B: int, n_A: int, number_fractions, cum_sums) -> int:
