@@ -1,0 +1,18 @@
+
+{
+    "seed": null,
+    "scale": 1.0,
+    "r_B": 0.0295,
+    "r_A": 0.1,
+    "thickness_B": 0.027,
+    "thickness_A": 0.0871,
+    "density_B": 15.1,
+    "density_A": 5.1,
+    "mass_fraction_B": 0.05,
+    "num_cubes_x": 4,
+    "num_cubes_y": 4,
+    "num_cubes_z": 65,
+    "num_sides": 6,
+    "distance": 0.25,
+  "quit_on_finish": false
+}

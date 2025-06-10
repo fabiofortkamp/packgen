@@ -1,108 +1,109 @@
-# Script by Andrea Insinga
+"""Run packing simulation in Blender.
 
-# this enables testing the top-level functions
-# in environments without Blender
-try:
-    import bpy
-except ImportError:
-    bpy = None
-import random
+This script reads parameters from a file passed on the
+command line, or "parameters.json" by default, and
+simulates particles falling due to the gravitational field
+inside a container box.
+
+There are two types of particles, "A" and "B". The particles are assumed to be
+prismatic, with the polygonal faces characterized by a circumscribed radius,
+and the prism having a given height. The parameters file describes these
+geometric parameters, together with the densities of the particles.
+The container configuration is also included.
+
+Original design and implementation by Andrea Insinga.
+"""
+
 import array as arr
+import json
+import math
+import random
+import sys
+from pathlib import Path
+
+import bpy
 import numpy as np
 
 
-def volume_prism(sides, radii, heights):
-    # https://en.wikipedia.org/wiki/Regular_polygon
+def get_parameters_file() -> str:
+    """Parse argument lists and return parameters file name."""
+    if "--" in sys.argv:
+        argv = sys.argv[sys.argv.index("--") + 1 :]  # get all args after "--"
+        parameters_file = argv[0]
+    else:
+        parameters_file = "parameters.json"
+    return parameters_file
 
-    sides = np.array(sides)
-    radii = np.array(radii)
-    heights = np.array(heights)
 
-    return 1 / 2 * sides * np.square(radii) * np.sin(2 * np.pi / sides) * heights
+def load_parameters(
+    parameters_file: str = "parameters.json",
+) -> dict[str, float | bool]:
+    """Load parameters from a JSON file.
 
+    Args:
+        parameters_file (str): Path to the parameters file.
+            Defaults to "parameters.json".
 
-# Mass fractions
-def number_ratio(mass_ratio, densities, heights, radii, total_mass):
+    Returns:
+        dict[str, float]: The loaded parameters mapping strings to float values.
+            If 'seed' is null in the JSON, it will be converted to a random float.
     """
-    Calculate the number ratio of the materials in the mixture given the mass ratio, densities, volumes and total mass of the components.
+    with open(parameters_file) as f:
+        params = json.load(f)
+        if params.get("seed") is None:
+            params["seed"] = random.random() * 1e6
+        return params
+
+
+PARAMETERS = load_parameters(get_parameters_file())
+
+
+def volume_prism(sides: float, radius: float, height: float) -> float:
+    """Return the volume of a prism with given number of sides, radius, and height.
+
+    References:
+        https://en.wikipedia.org/wiki/Regular_polygon
     """
-
-    # Calculate the volumes of each particle
-    particle_volumes = volume_prism([6] * len(radii), radii, heights)
-
-    # What percentage of the total mass is taken by each type of particle in the mixture?
-    mass_percentages = [x / sum(mass_ratio) for x in mass_ratio]
-
-    # What is mass, volume and number of each type of particle in the mixture?
-    mass_components = [x * total_mass for x in mass_percentages]
-    volume_components = [
-        x / y if y > 0 else 0 for x, y in zip(mass_components, densities)
-    ]
-
-    # must round up or down to the nearest integer
-    number_components = [
-        int(np.ceil(x / y)) for x, y in zip(volume_components, particle_volumes)
-    ]
-
-    number_percentages = [x / sum(number_components) for x in number_components]
-
-    return number_percentages, number_components
+    return 1 / 2 * sides * np.square(radius) * np.sin(2 * np.pi / sides) * height
 
 
-# 1) Select "Scripting" workspace
-# 2) In the "Text Editor" window, open this script and click "Run Script"
-# 3) Select "Animation" workspace
-# 4) In the "Timeline" press "Play"
-# 5) Erase the cube and export as stl.
+def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> int:
+    """Return the total number of type-B particles to be generated.
 
-GlobalScaleFactor = 2.5
-# The two arrays must be the same number of elements
-# (they represent COMBINATIONS of radius and height)
-CombinationsRadii = arr.array(
-    "d", [0.0500, 0.0750, 0.1000, 0.1250, 0.1500, 0.1750, 0.2000, 0.2250, 0.2500]
-)
-CombinationsHeights = arr.array(
-    "d", [0.0500, 0.0750, 0.1000, 0.1250, 0.1500, 0.1750, 0.2000, 0.2250, 0.2500]
-)
+    Args:
+        parameters (dict[str, float]): The parameters of the packing simulation.
+        num_particles_total (int): The total number of particles to be generated.
+    """
+    rho_B = parameters["density_B"]
+    rho_A = parameters["density_A"]
 
+    r_B = parameters["r_B"]
+    r_A = parameters["r_A"]
 
-CombinationsMassFractions = arr.array(
-    "d", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
-)
-CombinationDensities = arr.array("d", [0.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 3.2])
-TotalMass = 500.0
+    h_B = parameters["thickness_B"]
+    h_A = parameters["thickness_A"]
 
-CombinationsFractions, CombinationsPopulations = number_ratio(
-    CombinationsMassFractions,
-    CombinationDensities,
-    CombinationsHeights,
-    CombinationsRadii,
-    TotalMass,
-)
-CombinationsFractions = arr.array("d", CombinationsFractions)
-# CombinationsFractions = arr.array("d", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
-CombinationsCumSum = arr.array("d", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-CombinationRed = arr.array("d", [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
-CombinationGreen = arr.array("d", [0.0, 0.0, 0.0, 0.0, 0.6, 0.0, 0.0, 0.0, 0.8])
-CombinationBlue = arr.array("d", [0.0, 0.0, 0.0, 0.0, 0.7, 0.0, 0.0, 0.0, 0.5])
-TheSum = sum(CombinationsFractions)
+    n_sides = int(parameters["num_sides"])
+    V_B = volume_prism(n_sides, r_B, h_B)
+    V_A = volume_prism(n_sides, r_A, h_A)
 
-# Normalize array
-for i in range(len(CombinationsFractions)):
-    CombinationsFractions[i] = CombinationsFractions[i] / TheSum
+    beta = rho_B * V_B / (rho_A * V_A)
 
-# Cumulative Sum
-CumulativeSum = 0.0
-for i in range(len(CombinationsFractions)):
-    CumulativeSum = CumulativeSum + CombinationsFractions[i]
-    CombinationsCumSum[i] = CumulativeSum
+    x_B = parameters["mass_fraction_B"]
+    alpha = 1 / beta * (x_B / (1 - x_B))
+
+    N_B = alpha / (1 + alpha) * num_particles_total
+
+    return math.ceil(N_B)
 
 
-# Container box
-def create_cube_without_top_face(thesize):
-    scale_z = 3
+def create_container_without_top_face(side: float, height: float, thickness: float):
+    height_to_side_scale = height / side
     bpy.ops.mesh.primitive_cube_add(
-        size=thesize, enter_editmode=False, location=(0, 0, 0), scale=(1, 1, scale_z)
+        size=side,
+        enter_editmode=False,
+        location=(0, 0, height / 2),
+        scale=(1, 1, height_to_side_scale),
     )
     cube = bpy.context.active_object
 
@@ -119,57 +120,131 @@ def create_cube_without_top_face(thesize):
     bpy.ops.mesh.delete(type="FACE")
     bpy.ops.object.mode_set(mode="OBJECT")
 
-    return cube
-
-
-def add_solidify_modifier(cube, thickness):
     modifier = cube.modifiers.new(name="Solidify", type="SOLIDIFY")
     modifier.thickness = thickness
 
-
-def add_passive_rigidbody(cube):
     bpy.ops.rigidbody.object_add(type="PASSIVE")
     cube.rigid_body.collision_shape = "MESH"
 
+    return cube
+
+
+def get_params_suffix() -> str:
+    """Get the base name of the parameters file without extension to use as a suffix.
+
+    Returns:
+        str: The base name of the parameters file without extension.
+    """
+    return Path(get_parameters_file()).stem
+
+
+def bake_and_export(end_frame: int = 230, container=None):
+    scene = bpy.context.scene
+    # set the frame range
+    scene.frame_start = 1
+    scene.frame_end = end_frame
+
+    # free any old bake, then bake all caches
+    if scene.rigidbody_world:
+        bpy.ops.ptcache.free_bake_all()
+        bpy.ops.ptcache.bake_all()
+
+    # step to the last frame so all transforms are final
+    scene.frame_set(end_frame)
+
+    bpy.ops.wm.save_mainfile(filepath=f"packing_{get_params_suffix()}.blender")
+    if container and container.name in bpy.data.objects:
+        # Method A: use the data API
+        obj = bpy.data.objects[container.name]
+        bpy.data.objects.remove(obj, do_unlink=True)
+    # export STL with the correct operator
+    stl_path = f"packing_{get_params_suffix()}.stl"
+    print("Exporting STL to", stl_path)
+    bpy.ops.wm.stl_export(filepath=stl_path)
+
+    if PARAMETERS.get("quit_on_finish", False):
+        bpy.ops.wm.quit_blender()
+
+
+def decide_cube(n_B: int, n_A: int, number_fractions, cum_sums) -> int:
+    """Decide which cube type to generate, based on how many were generated."""
+    ThisRandomNumber = random.uniform(0.0, 1.0)
+    LastI = -1
+    for i in range(len(number_fractions)):
+        if ThisRandomNumber > cum_sums[i]:
+            LastI = i
+    LastI = LastI + 1
+    return LastI
+
 
 def main():
-    # Customize the following parameters for your array of cubes
-    num_cubes_x = 2  # Number of cubes along the X axis
-    num_cubes_y = 2  # Number of cubes along the Y axis
-    num_cubes_z = 50  # Max number of   cubes along the Z axis
-    total_number = sum(CombinationsPopulations)
+    scale = PARAMETERS["scale"]
 
-    distance = 2.5  # Distance between the cubes
-    mu = 0  # Mean of the log-normal distribution
-    sigma = 0.1  # Standard deviation of the log-normal distribution
-    random.seed(42)  # Optional: set a seed for reproducible results
+    # convention for indices for the "A" and "non-A" particles
+    I_B = 1
+
+    radii = arr.array("d", [PARAMETERS["r_A"], PARAMETERS["r_B"]])
+    heights = arr.array("d", [PARAMETERS["thickness_A"], PARAMETERS["thickness_B"]])
+
+    num_cubes_x = int(PARAMETERS["num_cubes_x"])  # Number of cubes along the X axis
+    num_cubes_y = int(PARAMETERS["num_cubes_y"])  # Number of cubes along the Y axis
+    num_cubes_z = int(PARAMETERS["num_cubes_z"])  # Number of cubes along the Z axis
+    num_cubes_total = num_cubes_x * num_cubes_y * num_cubes_z
+    num_cubes_B = num_B_particles(PARAMETERS, num_cubes_total)
+    number_fraction_B = num_cubes_B / num_cubes_total
+    distance = PARAMETERS["distance"]  # Distance between the cubes
+    seed = PARAMETERS["seed"]
+
+    z0 = distance / 2
+    number_fractions = arr.array("d", [1.0 - number_fraction_B, number_fraction_B])
+    cum_sums = arr.array("d", [0.0, 0.0])
+    CombinationRed = arr.array("d", [0.1, 0.8])
+    CombinationGreen = arr.array("d", [0.8, 0.4])
+    CombinationBlue = arr.array("d", [0.7, 0.7])
+
+    random.seed(seed)  # Optional: set a seed for reproducible results
+    the_sum = sum(number_fractions)
+
+    # Normalize array
+    for i in range(len(number_fractions)):
+        number_fractions[i] = number_fractions[i] / the_sum
+
+    # Cumulative Sum
+    cum_sum = 0.0
+    for i in range(len(number_fractions)):
+        cum_sum = cum_sum + number_fractions[i]
+        cum_sums[i] = cum_sum
 
     # Delete all existing mesh objects
     bpy.ops.object.select_all(action="DESELECT")
     bpy.ops.object.select_by_type(type="MESH")
     bpy.ops.object.delete()
 
+    n_sides = PARAMETERS["num_sides"]
     # Create an array of cubes with random sizes determined by the log-normal distribution
-    count = 0
+    n_generated_cubes_B = 0
+    n_generated_cubed_A = 0
     for x in range(num_cubes_x):
         for y in range(num_cubes_y):
             for z in range(num_cubes_z):
-                ThisRandomNumber = random.uniform(0.0, 1.0)
-                LastI = -1
-                for i in range(len(CombinationsFractions)):
-                    if ThisRandomNumber > CombinationsCumSum[i]:
-                        LastI = i
-                LastI = LastI + 1
+                LastI = decide_cube(
+                    n_generated_cubes_B, n_generated_cubed_A, number_fractions, cum_sums
+                )
+
+                if LastI == I_B:
+                    n_generated_cubes_B += 1
+                else:
+                    n_generated_cubed_A += 1
 
                 bpy.ops.mesh.primitive_cylinder_add(
-                    vertices=6,
-                    radius=GlobalScaleFactor * CombinationsRadii[LastI],
-                    depth=GlobalScaleFactor * CombinationsHeights[LastI],
+                    vertices=n_sides,
+                    radius=scale * radii[LastI],
+                    depth=scale * heights[LastI],
                     enter_editmode=False,
                     location=(
                         (x - num_cubes_x / 2 + 0.5) * distance,
                         (y - num_cubes_y / 2 + 0.5) * distance,
-                        z * distance,
+                        z0 + z * distance,
                     ),
                 )
 
@@ -199,15 +274,14 @@ def main():
 
                 cube.active_material = mat
 
-                if count == total_number:
-                    break
-
     thickness = -0.2
 
-    cube = create_cube_without_top_face((num_cubes_x) * distance)
-    add_solidify_modifier(cube, thickness)
+    container = create_container_without_top_face(
+        (num_cubes_x) * distance, num_cubes_z * distance, thickness
+    )
+    container.name = "Container"
 
-    add_passive_rigidbody(cube)
+    bake_and_export(end_frame=230, container=container)
 
 
 if __name__ == "__main__":
