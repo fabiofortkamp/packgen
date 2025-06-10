@@ -35,7 +35,9 @@ def get_parameters_file() -> str:
     return parameters_file
 
 
-def load_parameters(parameters_file: str = "parameters.json") -> dict[str, float]:
+def load_parameters(
+    parameters_file: str = "parameters.json",
+) -> dict[str, float | bool]:
     """Load parameters from a JSON file.
 
     Args:
@@ -51,6 +53,9 @@ def load_parameters(parameters_file: str = "parameters.json") -> dict[str, float
         if params.get("seed") is None:
             params["seed"] = random.random() * 1e6
         return params
+
+
+PARAMETERS = load_parameters(get_parameters_file())
 
 
 def volume_prism(sides: float, radius: float, height: float) -> float:
@@ -146,7 +151,8 @@ def stop_playback(scene):
         bpy.ops.screen.animation_cancel(restore_frame=False)
         bpy.ops.object.delete(use_global=False)
         export_stl()
-        bpy.ops.wm.quit_blender()
+        if PARAMETERS["quit_on_finish"]:
+            bpy.ops.wm.quit_blender()
 
 
 def decide_cube(n_B: int, n_A: int, number_fractions, cum_sums) -> int:
@@ -161,23 +167,22 @@ def decide_cube(n_B: int, n_A: int, number_fractions, cum_sums) -> int:
 
 
 def main():
-    parameters = load_parameters(get_parameters_file())
-    scale = parameters["scale"]
+    scale = PARAMETERS["scale"]
 
     # convention for indices for the "A" and "non-A" particles
     I_B = 1
 
-    radii = arr.array("d", [parameters["r_A"], parameters["r_B"]])
-    heights = arr.array("d", [parameters["thickness_A"], parameters["thickness_B"]])
+    radii = arr.array("d", [PARAMETERS["r_A"], PARAMETERS["r_B"]])
+    heights = arr.array("d", [PARAMETERS["thickness_A"], PARAMETERS["thickness_B"]])
 
-    num_cubes_x = int(parameters["num_cubes_x"])  # Number of cubes along the X axis
-    num_cubes_y = int(parameters["num_cubes_y"])  # Number of cubes along the Y axis
-    num_cubes_z = int(parameters["num_cubes_z"])  # Number of cubes along the Z axis
+    num_cubes_x = int(PARAMETERS["num_cubes_x"])  # Number of cubes along the X axis
+    num_cubes_y = int(PARAMETERS["num_cubes_y"])  # Number of cubes along the Y axis
+    num_cubes_z = int(PARAMETERS["num_cubes_z"])  # Number of cubes along the Z axis
     num_cubes_total = num_cubes_x * num_cubes_y * num_cubes_z
-    num_cubes_B = num_B_particles(parameters, num_cubes_total)
+    num_cubes_B = num_B_particles(PARAMETERS, num_cubes_total)
     number_fraction_B = num_cubes_B / num_cubes_total
-    distance = parameters["distance"]  # Distance between the cubes
-    seed = parameters["seed"]
+    distance = PARAMETERS["distance"]  # Distance between the cubes
+    seed = PARAMETERS["seed"]
 
     z0 = distance / 2
     number_fractions = arr.array("d", [1.0 - number_fraction_B, number_fraction_B])
@@ -204,7 +209,7 @@ def main():
     bpy.ops.object.select_by_type(type="MESH")
     bpy.ops.object.delete()
 
-    n_sides = parameters["num_sides"]
+    n_sides = PARAMETERS["num_sides"]
     # Create an array of cubes with random sizes determined by the log-normal distribution
     n_generated_cubes_B = 0
     n_generated_cubed_A = 0

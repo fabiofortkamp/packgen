@@ -13,5 +13,6 @@
     "num_cubes_y": 4,
     "num_cubes_z": 65,
     "num_sides": 6,
-    "distance": 0.25
+    "distance": 0.25,
+  "quit_on_finish": false
 }

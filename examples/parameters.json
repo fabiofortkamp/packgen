@@ -12,5 +12,6 @@
     "num_cubes_y": 2,
     "num_cubes_z": 100,
     "num_sides": 6,
-    "distance": 1.5
+    "distance": 1.5,
+  "quit_on_finish": true
 }
