@@ -19,7 +19,7 @@ pip install git+https://github.com/cmt-dtu-energy/packgen@0.2.0
 
 ## Usage
 
-1. To run it, create a parameter file similar to the [example one](./parameters.json)
+1. To run it, create a parameter file -- check the [examples](./examples/);
 2. Run the following command in a directory where the 
 parameter file is located:
 
