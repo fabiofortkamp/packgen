@@ -138,21 +138,32 @@ def get_params_suffix() -> str:
     return Path(get_parameters_file()).stem
 
 
-def export_stl():
-    stl_path = f"packing_{get_params_suffix()}.stl"
+def bake_and_export(end_frame: int = 230, container=None):
+    scene = bpy.context.scene
+    # set the frame range
+    scene.frame_start = 1
+    scene.frame_end = end_frame
 
-    print("Exporting to", stl_path)
+    # free any old bake, then bake all caches
+    if scene.rigidbody_world:
+        bpy.ops.ptcache.free_bake_all()
+        bpy.ops.ptcache.bake_all()
+
+    # step to the last frame so all transforms are final
+    scene.frame_set(end_frame)
+
+    bpy.ops.wm.save_mainfile(filepath=f"packing_{get_params_suffix()}.blender")
+    if container and container.name in bpy.data.objects:
+        # Method A: use the data API
+        obj = bpy.data.objects[container.name]
+        bpy.data.objects.remove(obj, do_unlink=True)
+    # export STL with the correct operator
+    stl_path = f"packing_{get_params_suffix()}.stl"
+    print("Exporting STL to", stl_path)
     bpy.ops.wm.stl_export(filepath=stl_path)
 
-
-def stop_playback(scene):
-    if scene.frame_current == 230:
-        bpy.ops.wm.save_mainfile(filepath=f"packing_{get_params_suffix()}.blender")
-        bpy.ops.screen.animation_cancel(restore_frame=False)
-        bpy.ops.object.delete(use_global=False)
-        export_stl()
-        if PARAMETERS["quit_on_finish"]:
-            bpy.ops.wm.quit_blender()
+    if PARAMETERS.get("quit_on_finish", False):
+        bpy.ops.wm.quit_blender()
 
 
 def decide_cube(n_B: int, n_A: int, number_fractions, cum_sums) -> int:
@@ -265,12 +276,12 @@ def main():
 
     thickness = -0.2
 
-    cube = create_container_without_top_face(
+    container = create_container_without_top_face(
         (num_cubes_x) * distance, num_cubes_z * distance, thickness
     )
+    container.name = "Container"
 
-    bpy.app.handlers.frame_change_pre.append(stop_playback)
-    bpy.ops.screen.animation_play()
+    bake_and_export(end_frame=230, container=container)
 
 
 if __name__ == "__main__":
