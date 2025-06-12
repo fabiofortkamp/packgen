@@ -13,7 +13,7 @@ below;
 2. Install this project with `pip` or `uv pip`:
 
 ```shell
-pip install git+https://github.com/cmt-dtu-energy/packgen@0.2.0
+pip install git+https://github.com/cmt-dtu-energy/packgen@v0.2.1
 ```
 
 
