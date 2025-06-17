@@ -28,8 +28,15 @@ packgen -- <path to the parameter file>
 ```
 
 You can name the parameters file in any way you want; this command will open Blender,
-simulate the packing, and then save `.blender` and `.stl` files in the current
+simulate the packing, and then save `.blender`, `.stl`, and `.json` files in the current
 directory. The filenames will have file names as `packing_<basename of parameter file>.<extention>`.
+Here what they contain:
+
+- `.blend`: the complete Blender file that can be reproduced and used for rendering;
+- `.stl`: the STL file that contains only the particles, without the container;
+- `.json`: a copy with the input parameters, but in particular with the value of the `seed`
+that is used; you can pass a `null` value in the input file to get multiple random
+drawings of the same configuration, and the output will store the value of seed used.
 
 If you omit the `-- <path to the parameter file>` part, by default `packgen` will read
 a file named `parameters.json` in the current directory.

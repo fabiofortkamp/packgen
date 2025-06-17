@@ -153,6 +153,11 @@ def bake_and_export(end_frame: int = 230, container=None):
     scene.frame_set(end_frame)
 
     bpy.ops.wm.save_mainfile(filepath=f"packing_{get_params_suffix()}.blender")
+
+    json_path = f"packing_{get_params_suffix()}.json"
+    with open(json_path, mode="w") as f:
+        json.dump(PARAMETERS, f)
+
     if container and container.name in bpy.data.objects:
         # Method A: use the data API
         obj = bpy.data.objects[container.name]
