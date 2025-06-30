@@ -35,6 +35,19 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = ["pytest>=8.3.5"]
 
+[tool.ruff.lint]
+extend-select = [
+  "ANN", # annotations
+  "FBT", # boolean trap
+  "B",
+  "A",
+  "C",
+  "D"
+]
+
+extend-ignore = [
+  "ANN401", # for now, we have to rely on "Any" types
+]
 [tool.basedpyright]
 typeCheckingMode = "basic"
 allowedUntypedLibraries = ["bpy"]

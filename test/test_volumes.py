@@ -5,7 +5,7 @@ from math import isclose, sqrt
 from packgen import blend
 
 
-def test_volume_prism_coincides_with_hexagon():
+def test_volume_prism_coincides_with_hexagon() -> None:
     """Check volume calculation with known expression for hexagonal prisms."""
     r = 2.3
     h = 4.5
