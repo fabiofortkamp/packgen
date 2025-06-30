@@ -16,7 +16,7 @@ authors = [
     { name = "Andreas Papanikolaou", email = "s232477@student.dtu.dk" },
 ]
 requires-python = ">=3.11, <3.12"
-dependencies = ["bpy>=4.4.0", "numpy>=2.2.3", "rich>=13.9.4"]
+dependencies = ["bpy>=4.4.0"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3.11",

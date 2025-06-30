@@ -23,7 +23,6 @@ import sys
 from pathlib import Path
 
 import bpy
-import numpy as np
 
 
 def get_parameters_file() -> str:
@@ -67,7 +66,7 @@ def volume_prism(sides: float, radius: float, height: float) -> float:
         https://en.wikipedia.org/wiki/Regular_polygon
 
     """
-    return 1 / 2 * sides * np.square(radius) * np.sin(2 * np.pi / sides) * height
+    return 1 / 2 * sides * (radius) * radius * math.sin(2 * math.pi / sides) * height
 
 
 def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> int:
