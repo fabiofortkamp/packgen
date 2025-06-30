@@ -228,8 +228,8 @@ def main() -> None:
     seed = PARAMETERS["seed"]
 
     z0 = distance / 2
-    number_fractions = arr.array("d", [1.0 - number_fraction_B, number_fraction_B])
-    cum_sums = arr.array("d", [0.0, 0.0])
+    number_fractions = [1.0 - number_fraction_B, number_fraction_B]
+    cum_sums = [0.0, 0.0]
     CombinationRed = arr.array("d", [0.1, 0.8])
     CombinationGreen = arr.array("d", [0.8, 0.4])
     CombinationBlue = arr.array("d", [0.7, 0.7])
