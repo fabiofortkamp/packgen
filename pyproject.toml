@@ -1,19 +1,29 @@
 [project]
 name = "packgen"
-version = "0.3.0"
+version = "0.4.0"
 description = "Particle packing generator"
+keywords = [
+    "blender",
+    "bpy",
+    "particle packing",
+    "packing generator",
+    "simulation",
+]
 readme = "README.md"
 authors = [
     { name = "Fábio P. Fortkamp", email = "fabio@fabiofortkamp.com" },
     { name = "Andrea R. Insinga", email = "aroin@dtu.dk" },
-    { name = "Andreas Papanikolaou", email = "" }
+    { name = "Andreas Papanikolaou", email = "s232477@student.dtu.dk" },
 ]
 requires-python = ">=3.11, <3.12"
-dependencies = [
-    "bpy>=4.4.0",
-    "numpy>=2.2.3",
-    "rich>=13.9.4",
+dependencies = ["bpy>=4.4.0", "numpy < 2"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: MIT License",
 ]
+license = { file = "LICENSE" }
 
 [project.scripts]
 packgen = "packgen:main"
@@ -23,11 +33,21 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = [
-    "pytest>=8.3.5",
+dev = ["pytest>=8.3.5"]
+
+[tool.ruff.lint]
+extend-select = [
+  "ANN", # annotations
+  "FBT", # boolean trap
+  "B",
+  "A",
+  "C",
+  "D"
 ]
 
+extend-ignore = [
+  "ANN401", # for now, we have to rely on "Any" types
+]
 [tool.basedpyright]
 typeCheckingMode = "basic"
 allowedUntypedLibraries = ["bpy"]
-

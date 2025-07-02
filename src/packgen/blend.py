@@ -18,11 +18,11 @@ import array as arr
 import json
 import math
 import random
+from typing import Any
 import sys
 from pathlib import Path
 
 import bpy
-import numpy as np
 
 
 def get_parameters_file() -> str:
@@ -47,6 +47,7 @@ def load_parameters(
     Returns:
         dict[str, float]: The loaded parameters mapping strings to float values.
             If 'seed' is null in the JSON, it will be converted to a random float.
+
     """
     with open(parameters_file) as f:
         params = json.load(f)
@@ -63,8 +64,9 @@ def volume_prism(sides: float, radius: float, height: float) -> float:
 
     References:
         https://en.wikipedia.org/wiki/Regular_polygon
+
     """
-    return 1 / 2 * sides * np.square(radius) * np.sin(2 * np.pi / sides) * height
+    return 1 / 2 * sides * (radius) * radius * math.sin(2 * math.pi / sides) * height
 
 
 def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> int:
@@ -73,6 +75,7 @@ def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> i
     Args:
         parameters (dict[str, float]): The parameters of the packing simulation.
         num_particles_total (int): The total number of particles to be generated.
+
     """
     rho_B = parameters["density_B"]
     rho_A = parameters["density_A"]
@@ -97,7 +100,17 @@ def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> i
     return math.ceil(N_B)
 
 
-def create_container_without_top_face(side: float, height: float, thickness: float):
+def create_container_without_top_face(
+    side: float, height: float, thickness: float
+) -> Any:
+    """Create an open cube-like container of given side length and height.
+
+    Args:
+        side (float): The length of the sides of the cube.
+        height (float): The height of the container.
+        thickness (float): The thickness of the container walls.
+
+    """
     height_to_side_scale = height / side
     bpy.ops.mesh.primitive_cube_add(
         size=side,
@@ -134,11 +147,21 @@ def get_params_suffix() -> str:
 
     Returns:
         str: The base name of the parameters file without extension.
+
     """
     return Path(get_parameters_file()).stem
 
 
-def bake_and_export(end_frame: int = 230, container=None):
+def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
+    """Bake the physics simulation and export the results.
+
+    Args:
+        end_frame (int): The last frame to bake the simulation to.
+            Defaults to 230.
+        container: The container object to be used in the simulation.
+            If None, no container will be created.
+
+    """
     scene = bpy.context.scene
     # set the frame range
     scene.frame_start = 1
@@ -171,7 +194,9 @@ def bake_and_export(end_frame: int = 230, container=None):
         bpy.ops.wm.quit_blender()
 
 
-def decide_cube(n_B: int, n_A: int, number_fractions, cum_sums) -> int:
+def decide_cube(
+    n_B: int, n_A: int, number_fractions: list[float], cum_sums: list[float]
+) -> int:
     """Decide which cube type to generate, based on how many were generated."""
     ThisRandomNumber = random.uniform(0.0, 1.0)
     LastI = -1
@@ -182,7 +207,8 @@ def decide_cube(n_B: int, n_A: int, number_fractions, cum_sums) -> int:
     return LastI
 
 
-def main():
+def main() -> None:
+    """Main function to run the particle packing simulation."""  # noqa: D401
     scale = PARAMETERS["scale"]
 
     # convention for indices for the "A" and "non-A" particles
@@ -201,8 +227,8 @@ def main():
     seed = PARAMETERS["seed"]
 
     z0 = distance / 2
-    number_fractions = arr.array("d", [1.0 - number_fraction_B, number_fraction_B])
-    cum_sums = arr.array("d", [0.0, 0.0])
+    number_fractions = [1.0 - number_fraction_B, number_fraction_B]
+    cum_sums = [0.0, 0.0]
     CombinationRed = arr.array("d", [0.1, 0.8])
     CombinationGreen = arr.array("d", [0.8, 0.4])
     CombinationBlue = arr.array("d", [0.7, 0.7])
@@ -226,7 +252,6 @@ def main():
     bpy.ops.object.delete()
 
     n_sides = PARAMETERS["num_sides"]
-    # Create an array of cubes with random sizes determined by the log-normal distribution
     n_generated_cubes_B = 0
     n_generated_cubed_A = 0
     for x in range(num_cubes_x):
