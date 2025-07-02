@@ -10,6 +10,7 @@ The current physics engine is based on Blender.
 
 import os.path
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -20,10 +21,7 @@ BLENDER_SCRIPT_FLAG = "-P"
 
 
 def find_Blender_executable() -> str:
-    """Find the Blender executable path based on the platform.
-
-    Currently supports Windows and macOS.
-    """
+    """Find the Blender executable path based on the platform."""
     platform_name = platform.system()
     if platform_name == "Windows":
         return os.path.join(
@@ -38,6 +36,8 @@ def find_Blender_executable() -> str:
         return os.path.join(
             "/Applications", "Blender.app", "Contents", "MacOS", "Blender"
         )
+    elif platform_name == "Linux":
+        return shutil.which("blender") or "/bin/blender"
     else:
         raise NotImplementedError
 
