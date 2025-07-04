@@ -22,6 +22,7 @@ from typing import Any
 import sys
 from pathlib import Path
 
+import os
 import bpy
 
 
@@ -162,6 +163,7 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
             If None, no container will be created.
 
     """
+
     scene = bpy.context.scene
     # set the frame range
     scene.frame_start = 1
@@ -175,9 +177,15 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     # step to the last frame so all transforms are final
     scene.frame_set(end_frame)
 
-    bpy.ops.wm.save_mainfile(filepath=f"packing_{get_params_suffix()}.blender")
+    # Use the current working directory for all output files
+    output_dir = Path(os.getcwd())
+    suffix = get_params_suffix()
+    blend_path = output_dir / f"packing_{suffix}.blender"
+    json_path = output_dir / f"packing_{suffix}.json"
+    stl_path = output_dir / f"packing_{suffix}.stl"
 
-    json_path = f"packing_{get_params_suffix()}.json"
+    bpy.ops.wm.save_mainfile(filepath=str(blend_path))
+
     with open(json_path, mode="w") as f:
         json.dump(PARAMETERS, f)
 
@@ -186,9 +194,8 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
         obj = bpy.data.objects[container.name]
         bpy.data.objects.remove(obj, do_unlink=True)
     # export STL with the correct operator
-    stl_path = f"packing_{get_params_suffix()}.stl"
     print("Exporting STL to", stl_path)
-    bpy.ops.wm.stl_export(filepath=stl_path)
+    bpy.ops.wm.stl_export(filepath=str(stl_path))
 
     if PARAMETERS.get("quit_on_finish", False):
         bpy.ops.wm.quit_blender()
