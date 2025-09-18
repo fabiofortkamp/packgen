@@ -57,7 +57,23 @@ def load_parameters(
         return params
 
 
-PARAMETERS = load_parameters(get_parameters_file())
+PARAMETERS = {
+    "seed": None,
+    "scale": 1.0,
+    "r_B": 0.0295,
+    "r_A": 0.1,
+    "thickness_B": 0.027,
+    "thickness_A": 0.0871,
+    "density_B": 15.1,
+    "density_A": 5.1,
+    "mass_fraction_B": 0.05,
+    "num_cubes_x": 2,
+    "num_cubes_y": 2,
+    "num_cubes_z": 25,
+    "num_sides": 6,
+    "distance": 0.25,
+    "quit_on_finish": False
+}
 
 
 def volume_prism(sides: float, radius: float, height: float) -> float:
@@ -143,15 +159,17 @@ def create_container_without_top_face(
     return cube
 
 
+#def get_params_suffix() -> str:
+#    """Get the base name of the parameters file without extension to use as a suffix.
+
+#    Returns:
+#        str: The base name of the parameters file without extension.
+
+#    """
+#    return Path(get_parameters_file()).stem
+
 def get_params_suffix() -> str:
-    """Get the base name of the parameters file without extension to use as a suffix.
-
-    Returns:
-        str: The base name of the parameters file without extension.
-
-    """
-    return Path(get_parameters_file()).stem
-
+    return "parameters"
 
 def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     """Bake the physics simulation and export the results.
@@ -184,7 +202,7 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     json_path = output_dir / f"packing_{suffix}.json"
     stl_path = output_dir / f"packing_{suffix}.stl"
 
-    bpy.ops.wm.save_mainfile(filepath=str(blend_path))
+    bpy.ops.wm.save_mainfile(filepath=str(blend_path))  
 
     with open(json_path, mode="w") as f:
         json.dump(PARAMETERS, f)
@@ -257,6 +275,11 @@ def main() -> None:
     bpy.ops.object.select_all(action="DESELECT")
     bpy.ops.object.select_by_type(type="MESH")
     bpy.ops.object.delete()
+    
+    # Remove gravity
+    bpy.context.scene.rigidbody_world.effector_weights.gravity = 0.5
+
+
 
     n_sides = PARAMETERS["num_sides"]
     n_generated_cubes_B = 0
@@ -300,6 +323,7 @@ def main() -> None:
                 cube.rigid_body.friction = 0.5
                 cube.rigid_body.restitution = 0.5
 
+
                 mat = bpy.data.materials.new("PKHG")
                 mat.diffuse_color = (
                     float(CombinationRed[LastI]),
@@ -310,11 +334,26 @@ def main() -> None:
                 mat.specular_intensity = 0
 
                 cube.active_material = mat
+                
+    # add cube
+    bpy.ops.mesh.primitive_cube_add(
+    size=0.8*(num_cubes_x) * distance, 
+    enter_editmode=False, 
+    align='WORLD', 
+    location=(0, 0, num_cubes_z * distance), 
+    scale=(1, 1, 1))
+    block = bpy.context.active_object
+
+    bpy.ops.rigidbody.object_add(type="ACTIVE")
+    block.rigid_body.friction = 0.5
+    block.rigid_body.restitution = 0.5
+    block.rigid_body.mass = 100
+
 
     thickness = -0.2
 
     container = create_container_without_top_face(
-        (num_cubes_x) * distance, num_cubes_z * distance, thickness
+        (num_cubes_x) * distance, 1.2*(num_cubes_z * distance), thickness
     )
     container.name = "Container"
 
