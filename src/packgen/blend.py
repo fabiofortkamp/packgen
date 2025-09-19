@@ -71,7 +71,7 @@ PARAMETERS = {
     "num_cubes_y": 2,
     "num_cubes_z": 25,
     "num_sides": 6,
-    "distance": 0.25,
+    "distance": 0.28,
     "quit_on_finish": False,
     "mass_piston": 1,
     "particle_restitution": 0.5, # how much objects bounce after collision
@@ -352,13 +352,16 @@ def main() -> None:
                 
     L_container = (num_cubes_x) * distance
     slack = 0.05
+    max_z_particles = z0 + num_cubes_z*distance
                 
     # add piston
+    L_piston = 0.75*L_container
+    z_piston = 1.1*max_z_particles + L_piston/2
     bpy.ops.mesh.primitive_cube_add(
-    size=0.8*L_container, 
+    size=L_piston, 
     enter_editmode=False, 
     align='WORLD', 
-    location=(0, 0, num_cubes_z * distance), 
+    location=(0, 0, z_piston), 
     scale=(1, 1, 1))
     
     piston = bpy.context.active_object
@@ -373,7 +376,7 @@ def main() -> None:
 
     # create container
     container = create_container_without_top_face(
-        (num_cubes_x) * distance, 1.2*(num_cubes_z * distance), thickness
+        (num_cubes_x) * distance, 1.1*(z_piston + L_piston/2), thickness
     )
     container.name = "Container"
     
