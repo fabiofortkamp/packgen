@@ -76,6 +76,7 @@ PARAMETERS = {
     "mass_piston": 1,
     "particle_restitution": 0.5, # how much objects bounce after collision
     "particle_friction": 0, # fraction of velocity that is lost after collision
+    "particle_damping": 0.4, # fraction of linear velocity that is lost over time
 }
 
 
@@ -331,6 +332,11 @@ def main() -> None:
                 particle.rigid_body.friction = PARAMETERS["particle_friction"]
                 particle.rigid_body.restitution = PARAMETERS["particle_restitution"]
                 particle.rigid_body.mass = density*particle_volume
+                particle.rigid_body.linear_damping = PARAMETERS["particle_damping"]
+                
+                
+                
+
 
 
                 mat = bpy.data.materials.new("PKHG")
