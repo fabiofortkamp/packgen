@@ -72,7 +72,8 @@ PARAMETERS = {
     "num_cubes_z": 25,
     "num_sides": 6,
     "distance": 0.25,
-    "quit_on_finish": False
+    "quit_on_finish": False,
+    "mass_piston": 1
 }
 
 
@@ -275,10 +276,6 @@ def main() -> None:
     bpy.ops.object.select_all(action="DESELECT")
     bpy.ops.object.select_by_type(type="MESH")
     bpy.ops.object.delete()
-    
-    # Remove gravity
-    bpy.context.scene.rigidbody_world.effector_weights.gravity = 0.5
-
 
 
     n_sides = PARAMETERS["num_sides"]
@@ -293,8 +290,13 @@ def main() -> None:
 
                 if LastI == I_B:
                     n_generated_cubes_B += 1
+                    density = PARAMETERS["density_B"]
+                    
                 else:
                     n_generated_cubed_A += 1
+                    density = PARAMETERS["density_A"]
+                    
+                particle_volume = volume_prism(n_sides, scale * radii[LastI], scale * heights[LastI])
 
                 bpy.ops.mesh.primitive_cylinder_add(
                     vertices=n_sides,
@@ -308,20 +310,21 @@ def main() -> None:
                     ),
                 )
 
-                # Get the active object (the newly created cube)
-                cube = bpy.context.active_object
+                # Get the active object (the newly created particle)
+                particle = bpy.context.active_object
 
                 # Assign a random rotation to the cube
-                cube.rotation_euler = (
+                particle.rotation_euler = (
                     random.uniform(0, 6.283185),
                     random.uniform(0, 6.283185),
                     random.uniform(0, 6.283185),
                 )
 
-                # Add rigid body physics to the cube
+                # Add rigid body physics to the particle
                 bpy.ops.rigidbody.object_add(type="ACTIVE")
-                cube.rigid_body.friction = 0.5
-                cube.rigid_body.restitution = 0.5
+                particle.rigid_body.friction = 0.5
+                particle.rigid_body.restitution = 0.5
+                particle.rigid_body.mass = density*particle_volume
 
 
                 mat = bpy.data.materials.new("PKHG")
@@ -333,22 +336,26 @@ def main() -> None:
                 )
                 mat.specular_intensity = 0
 
-                cube.active_material = mat
+                particle.active_material = mat
                 
-    # add cube
+    L_container = (num_cubes_x) * distance
+    slack = 0.05
+                
+    # add piston
     bpy.ops.mesh.primitive_cube_add(
-    size=0.8*(num_cubes_x) * distance, 
+    size=0.8*L_container, 
     enter_editmode=False, 
     align='WORLD', 
     location=(0, 0, num_cubes_z * distance), 
     scale=(1, 1, 1))
-    block = bpy.context.active_object
+    
+    piston = bpy.context.active_object
 
     bpy.ops.rigidbody.object_add(type="ACTIVE")
-    block.rigid_body.friction = 0.5
-    block.rigid_body.restitution = 0.5
-    block.rigid_body.mass = 100
-
+    piston.rigid_body.friction = 0.5
+    piston.rigid_body.restitution = 0.5
+    piston.rigid_body.mass = PARAMETERS["mass_piston"]
+    piston.name = "Piston"
 
     thickness = -0.2
 
