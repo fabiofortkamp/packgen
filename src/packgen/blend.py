@@ -75,8 +75,8 @@ PARAMETERS = {
     "quit_on_finish": False,
     "mass_piston": 1,
     "particle_restitution": 0.5, # how much objects bounce after collision
-    "particle_friction": 0, # fraction of velocity that is lost after collision
-    "particle_damping": 0.4, # fraction of linear velocity that is lost over time
+    "particle_friction": 0.8, # fraction of velocity that is lost after collision
+    "particle_damping": 0.8, # fraction of linear velocity that is lost over time
 }
 
 
@@ -210,7 +210,7 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     json_path = output_dir / f"packing_{suffix}.json"
     stl_path = output_dir / f"packing_{suffix}.stl"
 
-    bpy.ops.wm.save_mainfile(filepath=str(blend_path))  
+    bpy.ops.wm.save_mainfile(filepath=str(blend_path))   
 
     with open(json_path, mode="w") as f:
         json.dump(PARAMETERS, f)
@@ -371,6 +371,7 @@ def main() -> None:
 
     thickness = -0.2
 
+    # create container
     container = create_container_without_top_face(
         (num_cubes_x) * distance, 1.2*(num_cubes_z * distance), thickness
     )
@@ -381,6 +382,7 @@ def main() -> None:
     bpy.context.object.rigid_body_constraint.type = 'GENERIC'
     bpy.context.object.rigid_body_constraint.object1 = bpy.data.objects["Container"]
     bpy.context.object.rigid_body_constraint.object2 = bpy.data.objects["Piston"]
+    # restrict rotation
     bpy.context.object.rigid_body_constraint.use_limit_ang_x = True
     bpy.context.object.rigid_body_constraint.use_limit_ang_y = True
     bpy.context.object.rigid_body_constraint.use_limit_ang_z = True
@@ -390,6 +392,10 @@ def main() -> None:
     bpy.context.object.rigid_body_constraint.limit_ang_y_upper = 0
     bpy.context.object.rigid_body_constraint.limit_ang_z_lower = 0
     bpy.context.object.rigid_body_constraint.limit_ang_z_upper = 0
+    # restrict linear motion
+    bpy.context.object.rigid_body_constraint.use_limit_lin_z = False
+
+    
 
 
     bake_and_export(end_frame=230, container=container)
