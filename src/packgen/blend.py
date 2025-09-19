@@ -377,23 +377,7 @@ def main() -> None:
     )
     container.name = "Container"
     
-    # fix angle between piston and container
-    bpy.ops.rigidbody.constraint_add()
-    bpy.context.object.rigid_body_constraint.type = 'GENERIC'
-    bpy.context.object.rigid_body_constraint.object1 = bpy.data.objects["Container"]
-    bpy.context.object.rigid_body_constraint.object2 = bpy.data.objects["Piston"]
-    # restrict rotation
-    bpy.context.object.rigid_body_constraint.use_limit_ang_x = True
-    bpy.context.object.rigid_body_constraint.use_limit_ang_y = True
-    bpy.context.object.rigid_body_constraint.use_limit_ang_z = True
-    bpy.context.object.rigid_body_constraint.limit_ang_x_lower = 0
-    bpy.context.object.rigid_body_constraint.limit_ang_x_upper = 0
-    bpy.context.object.rigid_body_constraint.limit_ang_y_lower = 0
-    bpy.context.object.rigid_body_constraint.limit_ang_y_upper = 0
-    bpy.context.object.rigid_body_constraint.limit_ang_z_lower = 0
-    bpy.context.object.rigid_body_constraint.limit_ang_z_upper = 0
-    # restrict linear motion
-    bpy.context.object.rigid_body_constraint.use_limit_lin_z = False
+
 
     
 
