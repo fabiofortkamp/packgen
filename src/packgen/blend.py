@@ -73,7 +73,9 @@ PARAMETERS = {
     "num_sides": 6,
     "distance": 0.25,
     "quit_on_finish": False,
-    "mass_piston": 1
+    "mass_piston": 1,
+    "particle_restitution": 0.5, # how much objects bounce after collision
+    "particle_friction": 0, # fraction of velocity that is lost after collision
 }
 
 
@@ -326,8 +328,8 @@ def main() -> None:
 
                 # Add rigid body physics to the particle
                 bpy.ops.rigidbody.object_add(type="ACTIVE")
-                particle.rigid_body.friction = 0.5
-                particle.rigid_body.restitution = 0.5
+                particle.rigid_body.friction = PARAMETERS["particle_friction"]
+                particle.rigid_body.restitution = PARAMETERS["particle_restitution"]
                 particle.rigid_body.mass = density*particle_volume
 
 
