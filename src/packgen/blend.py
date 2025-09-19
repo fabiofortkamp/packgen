@@ -187,6 +187,10 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     # set the frame range
     scene.frame_start = 1
     scene.frame_end = end_frame
+    
+    # setting gravity
+    g = -9.8 # m/s2
+    scene.gravity = [0, 0, 0.1*g]
 
     # free any old bake, then bake all caches
     if scene.rigidbody_world:
@@ -352,8 +356,8 @@ def main() -> None:
     piston = bpy.context.active_object
 
     bpy.ops.rigidbody.object_add(type="ACTIVE")
-    piston.rigid_body.friction = 0.5
-    piston.rigid_body.restitution = 0.5
+    piston.rigid_body.friction = 0 # piston does not lose velocity when collinding
+    piston.rigid_body.restitution = 0 # piston does not bounce when collinding
     piston.rigid_body.mass = PARAMETERS["mass_piston"]
     piston.name = "Piston"
 
