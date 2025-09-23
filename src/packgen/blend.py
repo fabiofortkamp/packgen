@@ -191,8 +191,8 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     scene.frame_end = end_frame
 
     # setting gravity
-    g = -9.8  # m/s2
-    scene.gravity = [0, 0, 0.1 * g]
+    g = PARAMETERS.get("gravity_field", [0, 0, -9.8])
+    scene.gravity = g
 
     # free any old bake, then bake all caches
     if scene.rigidbody_world:
