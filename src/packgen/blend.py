@@ -233,18 +233,22 @@ class Piston:
         slack = PARAMETERS.get("container_piston_slack", 0.0)
         L_piston = (1 - slack) * L_container
         z_piston = 1.1 * max_z_particles + L_piston / 2
-        bpy.ops.mesh.primitive_cube_add(
-            size=L_piston,
-            enter_editmode=False,
-            align='WORLD',
-            location=(0, 0, z_piston),
-            scale=(1, 1, 1))
-        piston = bpy.context.active_object
-        bpy.ops.rigidbody.object_add(type="ACTIVE")
-        piston.rigid_body.friction = 0  # piston does not lose velocity when colliding
-        piston.rigid_body.restitution = 0  # piston does not bounce when colliding
-        piston.rigid_body.mass = parameters["mass_piston"]
-        piston.name = "Piston"
+        
+        if parameters["use_piston"]:
+            bpy.ops.mesh.primitive_cube_add(
+                size=L_piston,
+                enter_editmode=False,
+                align='WORLD',
+                location=(0, 0, z_piston),
+                scale=(1, 1, 1))
+                
+            piston = bpy.context.active_object
+            bpy.ops.rigidbody.object_add(type="ACTIVE")
+            piston.rigid_body.friction = 0  # piston does not lose velocity when colliding
+            piston.rigid_body.restitution = 0  # piston does not bounce when colliding
+            piston.rigid_body.mass = parameters["mass_piston"]
+            piston.name = "Piston"
+        
         self.z = z_piston
         self.L = L_piston
 
@@ -280,8 +284,9 @@ PARAMETERS = {
     "save_files": False,
     "container_wall_thickness": -0.2,
     "container_piston_slack": 0.01,
-    "gravity_field": [0, 0, -9.8],
+    "gravity_field": [0, 0, -30],
     "end_frame":250,
+    "use_piston": True,
 }
 
 COMBINATION_RED = arr.array("d", [0.1, 0.8])
