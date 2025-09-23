@@ -279,7 +279,8 @@ PARAMETERS = {
     "particle_damping": 0.8,  # fraction of linear velocity that is lost over time
     "save_files": False,
     "container_wall_thickness": -0.2,
-    "container_piston_slack": 0.1
+    "container_piston_slack": 0.1,
+    "gravity_field": [0, 0, -5],
 }
 
 COMBINATION_RED = arr.array("d", [0.1, 0.8])
