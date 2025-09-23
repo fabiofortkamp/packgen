@@ -252,15 +252,6 @@ class Piston:
         self.z = z_piston
         self.L = L_piston
 
-
-
-
-
-
-
-
-
-
 PARAMETERS = {
     "seed": 42,
     "scale": 1.0,
@@ -284,8 +275,8 @@ PARAMETERS = {
     "save_files": False,
     "container_wall_thickness": -0.2,
     "container_piston_slack": 0.01,
-    "gravity_field": [0, 0, -30],
-    "end_frame":250,
+    "gravity_field": [0, 0, -5],
+    "end_frame":500,
     "use_piston": True,
 }
 
@@ -364,6 +355,8 @@ class PackingSimulation:
         bpy.ops.object.select_by_type(type="MESH")
         bpy.ops.object.delete()
 
+        bpy.ops.ptcache.free_bake_all()
+
     def _initialize_random_state(self):
         seed = self.parameters["seed"]
         random.seed(seed)
@@ -382,16 +375,16 @@ class PackingSimulation:
         # set the frame range
         scene.frame_start = 1
         scene.frame_end = end_frame
+        # Match the rigid body world's cache frames to scene start and end
+        scene.rigidbody_world.point_cache.frame_start = scene.frame_start
+        scene.rigidbody_world.point_cache.frame_end = scene.frame_end
 
         # setting gravity
         parameters = self.parameters
         g = parameters.get("gravity_field", [0, 0, -9.8])
         scene.gravity = g
 
-        # free any old bake, then bake all caches
-        if scene.rigidbody_world:
-            bpy.ops.ptcache.free_bake_all()
-            bpy.ops.ptcache.bake_all()
+        bpy.ops.ptcache.bake_all()
 
         # step to the last frame so all transforms are final
         scene.frame_set(end_frame)
