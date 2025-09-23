@@ -269,9 +269,9 @@ PARAMETERS = {
     "mass_fraction_B": 0.20,
     "num_particles_x": 2,
     "num_particles_y": 2,
-    "num_particles_z": 25,
+    "num_particles_z": 60,
     "num_sides": 6,
-    "distance": 0.28,
+    "distance": 0.6,
     "quit_on_finish": False,
     "mass_piston": 1,
     "particle_restitution": 0.5,  # how much objects bounce after collision
