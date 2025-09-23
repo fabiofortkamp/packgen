@@ -27,6 +27,88 @@ import os
 import bpy
 
 
+def get_parameters_file() -> str:
+    """Parse argument lists and return parameters file name."""
+    if "--" in sys.argv:
+        argv = sys.argv[sys.argv.index("--") + 1:]  # get all args after "--"
+        parameters_file = argv[0]
+    else:
+        parameters_file = "parameters.json"
+    return parameters_file
+
+
+def get_params_suffix() -> str:
+    """Get the base name of the parameters file without extension to use as a suffix.
+
+    Returns:
+        str: The base name of the parameters file without extension.
+
+    """
+    return Path(get_parameters_file()).stem
+
+
+def load_parameters(
+        parameters_file: str = "parameters.json",
+) -> dict[str, float | bool]:
+    """Load parameters from a JSON file.
+
+    Args:
+        parameters_file (str): Path to the parameters file.
+            Defaults to "parameters.json".
+
+    Returns:
+        dict[str, float]: The loaded parameters mapping strings to float values.
+            If 'seed' is null in the JSON, it will be converted to a random float.
+
+    """
+    with open(parameters_file) as f:
+        params = json.load(f)
+        if params.get("seed") is None:
+            params["seed"] = random.random() * 1e6
+        return params
+
+
+def volume_prism(sides: float, radius: float, height: float) -> float:
+    """Return the volume of a prism with given number of sides, radius, and height.
+
+    References:
+        https://en.wikipedia.org/wiki/Regular_polygon
+
+    """
+    return 1 / 2 * sides * radius * radius * math.sin(2 * math.pi / sides) * height
+
+
+def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> int:
+    """Return the total number of type-B particles to be generated.
+
+    Args:
+        parameters (dict[str, float]): The parameters of the packing simulation.
+        num_particles_total (int): The total number of particles to be generated.
+
+    """
+    rho_B = parameters["density_B"]
+    rho_A = parameters["density_A"]
+
+    r_B = parameters["r_B"]
+    r_A = parameters["r_A"]
+
+    h_B = parameters["thickness_B"]
+    h_A = parameters["thickness_A"]
+
+    n_sides = int(parameters["num_sides"])
+    V_B = volume_prism(n_sides, r_B, h_B)
+    V_A = volume_prism(n_sides, r_A, h_A)
+
+    beta = rho_B * V_B / (rho_A * V_A)
+
+    x_B = parameters["mass_fraction_B"]
+    alpha = 1 / beta * (x_B / (1 - x_B))
+
+    N_B = alpha / (1 + alpha) * num_particles_total
+
+    return math.ceil(N_B)
+
+
 class ParticleType(IntEnum):
     INVALID = -1
     A = 0
@@ -165,90 +247,6 @@ class Piston:
         piston.name = "Piston"
         self.z = z_piston
         self.L = L_piston
-
-
-def get_parameters_file() -> str:
-    """Parse argument lists and return parameters file name."""
-    if "--" in sys.argv:
-        argv = sys.argv[sys.argv.index("--") + 1:]  # get all args after "--"
-        parameters_file = argv[0]
-    else:
-        parameters_file = "parameters.json"
-    return parameters_file
-
-
-def get_params_suffix() -> str:
-    """Get the base name of the parameters file without extension to use as a suffix.
-
-    Returns:
-        str: The base name of the parameters file without extension.
-
-    """
-    return Path(get_parameters_file()).stem
-
-
-def load_parameters(
-        parameters_file: str = "parameters.json",
-) -> dict[str, float | bool]:
-    """Load parameters from a JSON file.
-
-    Args:
-        parameters_file (str): Path to the parameters file.
-            Defaults to "parameters.json".
-
-    Returns:
-        dict[str, float]: The loaded parameters mapping strings to float values.
-            If 'seed' is null in the JSON, it will be converted to a random float.
-
-    """
-    with open(parameters_file) as f:
-        params = json.load(f)
-        if params.get("seed") is None:
-            params["seed"] = random.random() * 1e6
-        return params
-
-
-def volume_prism(sides: float, radius: float, height: float) -> float:
-    """Return the volume of a prism with given number of sides, radius, and height.
-
-    References:
-        https://en.wikipedia.org/wiki/Regular_polygon
-
-    """
-    return 1 / 2 * sides * radius * radius * math.sin(2 * math.pi / sides) * height
-
-
-def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> int:
-    """Return the total number of type-B particles to be generated.
-
-    Args:
-        parameters (dict[str, float]): The parameters of the packing simulation.
-        num_particles_total (int): The total number of particles to be generated.
-
-    """
-    rho_B = parameters["density_B"]
-    rho_A = parameters["density_A"]
-
-    r_B = parameters["r_B"]
-    r_A = parameters["r_A"]
-
-    h_B = parameters["thickness_B"]
-    h_A = parameters["thickness_A"]
-
-    n_sides = int(parameters["num_sides"])
-    V_B = volume_prism(n_sides, r_B, h_B)
-    V_A = volume_prism(n_sides, r_A, h_A)
-
-    beta = rho_B * V_B / (rho_A * V_A)
-
-    x_B = parameters["mass_fraction_B"]
-    alpha = 1 / beta * (x_B / (1 - x_B))
-
-    N_B = alpha / (1 + alpha) * num_particles_total
-
-    return math.ceil(N_B)
-
-
 
 
 
