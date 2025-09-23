@@ -29,7 +29,7 @@ import bpy
 def get_parameters_file() -> str:
     """Parse argument lists and return parameters file name."""
     if "--" in sys.argv:
-        argv = sys.argv[sys.argv.index("--") + 1 :]  # get all args after "--"
+        argv = sys.argv[sys.argv.index("--") + 1:]  # get all args after "--"
         parameters_file = argv[0]
     else:
         parameters_file = "parameters.json"
@@ -37,7 +37,7 @@ def get_parameters_file() -> str:
 
 
 def load_parameters(
-    parameters_file: str = "parameters.json",
+        parameters_file: str = "parameters.json",
 ) -> dict[str, float | bool]:
     """Load parameters from a JSON file.
 
@@ -74,9 +74,9 @@ PARAMETERS = {
     "distance": 0.28,
     "quit_on_finish": False,
     "mass_piston": 1,
-    "particle_restitution": 0.5, # how much objects bounce after collision
-    "particle_friction": 0.8, # fraction of velocity that is lost after collision
-    "particle_damping": 0.8, # fraction of linear velocity that is lost over time
+    "particle_restitution": 0.5,  # how much objects bounce after collision
+    "particle_friction": 0.8,  # fraction of velocity that is lost after collision
+    "particle_damping": 0.8,  # fraction of linear velocity that is lost over time
 }
 
 
@@ -87,7 +87,7 @@ def volume_prism(sides: float, radius: float, height: float) -> float:
         https://en.wikipedia.org/wiki/Regular_polygon
 
     """
-    return 1 / 2 * sides * (radius) * radius * math.sin(2 * math.pi / sides) * height
+    return 1 / 2 * sides * radius * radius * math.sin(2 * math.pi / sides) * height
 
 
 def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> int:
@@ -122,7 +122,7 @@ def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> i
 
 
 def create_container_without_top_face(
-    side: float, height: float, thickness: float
+        side: float, height: float, thickness: float
 ) -> Any:
     """Create an open cube-like container of given side length and height.
 
@@ -175,6 +175,7 @@ def create_container_without_top_face(
 def get_params_suffix() -> str:
     return "parameters"
 
+
 def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     """Bake the physics simulation and export the results.
 
@@ -190,10 +191,10 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     # set the frame range
     scene.frame_start = 1
     scene.frame_end = end_frame
-    
+
     # setting gravity
-    g = -9.8 # m/s2
-    scene.gravity = [0, 0, 0.1*g]
+    g = -9.8  # m/s2
+    scene.gravity = [0, 0, 0.1 * g]
 
     # free any old bake, then bake all caches
     if scene.rigidbody_world:
@@ -210,7 +211,7 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     json_path = output_dir / f"packing_{suffix}.json"
     stl_path = output_dir / f"packing_{suffix}.stl"
 
-    bpy.ops.wm.save_mainfile(filepath=str(blend_path))   
+    bpy.ops.wm.save_mainfile(filepath=str(blend_path))
 
     with open(json_path, mode="w") as f:
         json.dump(PARAMETERS, f)
@@ -228,7 +229,7 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
 
 
 def decide_cube(
-    n_B: int, n_A: int, number_fractions: list[float], cum_sums: list[float]
+        n_B: int, n_A: int, number_fractions: list[float], cum_sums: list[float]
 ) -> int:
     """Decide which cube type to generate, based on how many were generated."""
     ThisRandomNumber = random.uniform(0.0, 1.0)
@@ -284,7 +285,6 @@ def main() -> None:
     bpy.ops.object.select_by_type(type="MESH")
     bpy.ops.object.delete()
 
-
     n_sides = PARAMETERS["num_sides"]
     n_generated_cubes_B = 0
     n_generated_cubed_A = 0
@@ -298,11 +298,11 @@ def main() -> None:
                 if LastI == I_B:
                     n_generated_cubes_B += 1
                     density = PARAMETERS["density_B"]
-                    
+
                 else:
                     n_generated_cubed_A += 1
                     density = PARAMETERS["density_A"]
-                    
+
                 particle_volume = volume_prism(n_sides, scale * radii[LastI], scale * heights[LastI])
 
                 bpy.ops.mesh.primitive_cylinder_add(
@@ -331,15 +331,10 @@ def main() -> None:
                 bpy.ops.rigidbody.object_add(type="ACTIVE")
                 particle.rigid_body.friction = PARAMETERS["particle_friction"]
                 particle.rigid_body.restitution = PARAMETERS["particle_restitution"]
-                particle.rigid_body.mass = density*particle_volume
+                particle.rigid_body.mass = density * particle_volume
                 particle.rigid_body.linear_damping = PARAMETERS["particle_damping"]
-                
-                
-                
 
-
-
-                mat = bpy.data.materials.new("PKHG")
+                mat = bpy.data.materials.new("GenericMaterial")
                 mat.diffuse_color = (
                     float(CombinationRed[LastI]),
                     float(CombinationGreen[LastI]),
@@ -349,26 +344,26 @@ def main() -> None:
                 mat.specular_intensity = 0
 
                 particle.active_material = mat
-                
-    L_container = (num_cubes_x) * distance
-    slack = 0.05
-    max_z_particles = z0 + num_cubes_z*distance
-                
+
+    L_container = num_cubes_x * distance
+    slack = 0.25
+    max_z_particles = z0 + num_cubes_z * distance
+
     # add piston
-    L_piston = 0.75*L_container
-    z_piston = 1.1*max_z_particles + L_piston/2
+    L_piston = (1-slack) * L_container
+    z_piston = 1.1 * max_z_particles + L_piston / 2
     bpy.ops.mesh.primitive_cube_add(
-    size=L_piston, 
-    enter_editmode=False, 
-    align='WORLD', 
-    location=(0, 0, z_piston), 
-    scale=(1, 1, 1))
-    
+        size=L_piston,
+        enter_editmode=False,
+        align='WORLD',
+        location=(0, 0, z_piston),
+        scale=(1, 1, 1))
+
     piston = bpy.context.active_object
 
     bpy.ops.rigidbody.object_add(type="ACTIVE")
-    piston.rigid_body.friction = 0 # piston does not lose velocity when collinding
-    piston.rigid_body.restitution = 0 # piston does not bounce when collinding
+    piston.rigid_body.friction = 0  # piston does not lose velocity when colliding
+    piston.rigid_body.restitution = 0  # piston does not bounce when colliding
     piston.rigid_body.mass = PARAMETERS["mass_piston"]
     piston.name = "Piston"
 
@@ -376,14 +371,9 @@ def main() -> None:
 
     # create container
     container = create_container_without_top_face(
-        (num_cubes_x) * distance, 1.1*(z_piston + L_piston/2), thickness
+        num_cubes_x * distance, 1.1 * (z_piston + L_piston / 2), thickness
     )
     container.name = "Container"
-    
-
-
-    
-
 
     bake_and_export(end_frame=230, container=container)
 
