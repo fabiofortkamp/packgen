@@ -32,6 +32,14 @@ class ParticleType(IntEnum):
     A = 0
     B = 1
 
+class Particle:
+    pass
+
+class Container:
+    pass
+
+class Piston:
+    pass
 
 def get_parameters_file() -> str:
     """Parse argument lists and return parameters file name."""
@@ -157,10 +165,11 @@ def create_container(
     return cube
 
 
-def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
+def bake_and_export(parameters, end_frame: int = 230, container: Any = None, ) -> None:
     """Bake the physics simulation and export the results.
 
     Args:
+        parameters: The parameters of the packing simulation
         end_frame (int): The last frame to bake the simulation to.
             Defaults to 230.
         container: The container of the particles that should be removed.
@@ -174,7 +183,7 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     scene.frame_end = end_frame
 
     # setting gravity
-    g = PARAMETERS.get("gravity_field", [0, 0, -9.8])
+    g = parameters.get("gravity_field", [0, 0, -9.8])
     scene.gravity = g
 
     # free any old bake, then bake all caches
@@ -187,7 +196,7 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
 
     # Use the current working directory for all output files
     stl_path: Path | None = None
-    if PARAMETERS.get("save_files", True):
+    if parameters.get("save_files", True):
         output_dir = Path(os.getcwd())
         suffix = get_params_suffix()
         blend_path = output_dir / f"packing_{suffix}.blend"
@@ -197,7 +206,7 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
         bpy.ops.wm.save_mainfile(filepath=str(blend_path))
 
         with open(json_path, mode="w") as f:
-            json.dump(PARAMETERS, f)
+            json.dump(parameters, f)
 
     # the container deletion should occur after the main saving above
     # to be able to inspect the Blender file
@@ -207,24 +216,24 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
         bpy.data.objects.remove(obj, do_unlink=True)
 
     # export STL with the correct operator
-    if PARAMETERS.get("save_files", True):
+    if parameters.get("save_files", True):
         if stl_path is not None:
             bpy.ops.wm.stl_export(filepath=str(stl_path))
         # if it is None, then something wrong happened and,
         # to avoid crashing, we simply don't save
 
-    if PARAMETERS.get("quit_on_finish", False):
+    if parameters.get("quit_on_finish", False):
         bpy.ops.wm.quit_blender()
 
 
-def decide_particle_type() -> ParticleType:
+def decide_particle_type(parameters) -> ParticleType:
     """Decide which cube type to generate."""
 
-    num_particles_x = int(PARAMETERS["num_particles_x"])  # Number of cubes along the X axis
-    num_particles_y = int(PARAMETERS["num_particles_y"])  # Number of cubes along the Y axis
-    num_particles_z = int(PARAMETERS["num_particles_z"])  # Number of cubes along the Z axis
+    num_particles_x = int(parameters["num_particles_x"])  # Number of cubes along the X axis
+    num_particles_y = int(parameters["num_particles_y"])  # Number of cubes along the Y axis
+    num_particles_z = int(parameters["num_particles_z"])  # Number of cubes along the Z axis
     num_particles_total = num_particles_x * num_particles_y * num_particles_z
-    num_particles_B = num_B_particles(PARAMETERS, num_particles_total)
+    num_particles_B = num_B_particles(parameters, num_particles_total)
     number_fraction_B = num_particles_B / num_particles_total
     rnd = random.uniform(0.0, 1.0)
     particle_type = ParticleType.A
@@ -239,22 +248,22 @@ def decide_particle_type() -> ParticleType:
     return particle_type
 
 
-def generate_particle(x, y, z, z0) -> ParticleType:
-    particle_type = decide_particle_type()
+def generate_particle(x, y, z, z0, parameters) -> ParticleType:
+    particle_type = decide_particle_type(parameters)
 
     if particle_type == ParticleType.B:
-        density = PARAMETERS["density_B"]
+        density = parameters["density_B"]
     else:
-        density = PARAMETERS["density_A"]
+        density = parameters["density_A"]
 
-    distance = PARAMETERS["distance"]  # Distance between the cubes
-    radii = arr.array("d", [PARAMETERS["r_A"], PARAMETERS["r_B"]])
-    heights = arr.array("d", [PARAMETERS["thickness_A"], PARAMETERS["thickness_B"]])
-    n_sides = PARAMETERS["num_sides"]
-    scale = PARAMETERS["scale"]
+    distance = parameters["distance"]  # Distance between the cubes
+    radii = arr.array("d", [parameters["r_A"], parameters["r_B"]])
+    heights = arr.array("d", [parameters["thickness_A"], parameters["thickness_B"]])
+    n_sides = parameters["num_sides"]
+    scale = parameters["scale"]
     particle_volume = volume_prism(n_sides, scale * radii[particle_type], scale * heights[particle_type])
-    num_particles_x = int(PARAMETERS["num_particles_x"])  # Number of cubes along the X axis
-    num_particles_y = int(PARAMETERS["num_particles_y"])  # Number of cubes along the Y axis
+    num_particles_x = int(parameters["num_particles_x"])  # Number of cubes along the X axis
+    num_particles_y = int(parameters["num_particles_y"])  # Number of cubes along the Y axis
 
     bpy.ops.mesh.primitive_cylinder_add(
         vertices=n_sides,
@@ -277,10 +286,10 @@ def generate_particle(x, y, z, z0) -> ParticleType:
     )
     # Add rigid body physics to the particle
     bpy.ops.rigidbody.object_add(type="ACTIVE")
-    particle.rigid_body.friction = PARAMETERS["particle_friction"]
-    particle.rigid_body.restitution = PARAMETERS["particle_restitution"]
+    particle.rigid_body.friction = parameters["particle_friction"]
+    particle.rigid_body.restitution = parameters["particle_restitution"]
     particle.rigid_body.mass = density * particle_volume
-    particle.rigid_body.linear_damping = PARAMETERS["particle_damping"]
+    particle.rigid_body.linear_damping = parameters["particle_damping"]
     mat = bpy.data.materials.new("GenericMaterial")
     mat.diffuse_color = (
         float(COMBINATION_RED[particle_type]),
@@ -293,6 +302,24 @@ def generate_particle(x, y, z, z0) -> ParticleType:
 
     return particle_type
 
+def generate_piston(L_container, max_z_particles,parameters):
+    slack = PARAMETERS.get("container_piston_slack",0.0)
+    L_piston = (1 - slack) * L_container
+    z_piston = 1.1 * max_z_particles + L_piston / 2
+    bpy.ops.mesh.primitive_cube_add(
+        size=L_piston,
+        enter_editmode=False,
+        align='WORLD',
+        location=(0, 0, z_piston),
+        scale=(1, 1, 1))
+    piston = bpy.context.active_object
+    bpy.ops.rigidbody.object_add(type="ACTIVE")
+    piston.rigid_body.friction = 0  # piston does not lose velocity when colliding
+    piston.rigid_body.restitution = 0  # piston does not bounce when colliding
+    piston.rigid_body.mass = parameters["mass_piston"]
+    piston.name = "Piston"
+
+    return z_piston, L_piston
 
 PARAMETERS = {
     "seed": None,
@@ -324,72 +351,54 @@ COMBINATION_GREEN = arr.array("d", [0.8, 0.4])
 COMBINATION_BLUE = arr.array("d", [0.7, 0.7])
 
 
-def main() -> None:
-    """Main function to run the particle packing simulation."""  # noqa: D401
+class PackingSimulation:
+    """Packing simulation to be performed with the physics-engine."""
 
+    def __init__(self, parameters: dict[str, Any]) -> None:
+        self.parameters = parameters
 
-    num_particles_x = int(PARAMETERS["num_particles_x"])  # Number of cubes along the X axis
-    num_particles_y = int(PARAMETERS["num_particles_y"])  # Number of cubes along the Y axis
-    num_particles_z = int(PARAMETERS["num_particles_z"])  # Number of cubes along the Z axis
+    def run(self):
+        """Run the particle packing simulation."""  # noqa: D401
 
-    distance = PARAMETERS["distance"]  # Distance between the cubes
-    seed = PARAMETERS["seed"]
+        parameters = self.parameters
+        seed = parameters["seed"]
+        random.seed(seed)  # Optional: set a seed for reproducible results
 
-    z0 = distance / 2
+        # Delete all existing mesh objects
+        bpy.ops.object.select_all(action="DESELECT")
+        bpy.ops.object.select_by_type(type="MESH")
+        bpy.ops.object.delete()
 
-    random.seed(seed)  # Optional: set a seed for reproducible results
+        n_generated_particles_B = 0
+        n_generated_particles_A = 0
+        num_particles_x = int(parameters["num_particles_x"])  # Number of cubes along the X axis
+        num_particles_y = int(parameters["num_particles_y"])  # Number of cubes along the Y axis
+        num_particles_z = int(parameters["num_particles_z"])  # Number of cubes along the Z axis
+        distance = parameters["distance"]  # Distance between the cubes
+        z0 = distance / 2
+        for x in range(num_particles_x):
+            for y in range(num_particles_y):
+                for z in range(num_particles_z):
+                    generated_particle_type = generate_particle(
+                        x, y, z, z0, parameters)
+                    if generated_particle_type == ParticleType.A:
+                        n_generated_particles_A += 1
+                    else:
+                        n_generated_particles_B += 1
 
-    # Delete all existing mesh objects
-    bpy.ops.object.select_all(action="DESELECT")
-    bpy.ops.object.select_by_type(type="MESH")
-    bpy.ops.object.delete()
+        L_container = num_particles_x * distance
+        max_z_particles = z0 + num_particles_z * distance
 
-    n_generated_particles_B = 0
-    n_generated_particles_A = 0
-    for x in range(num_particles_x):
-        for y in range(num_particles_y):
-            for z in range(num_particles_z):
-                generated_particle_type = generate_particle(
-                    x, y, z, z0)
-                if generated_particle_type == ParticleType.A:
-                    n_generated_particles_A += 1
-                else:
-                    n_generated_particles_B += 1
+        # add piston
+        z_piston, L_piston = generate_piston(L_container, max_z_particles,parameters)
 
-    L_container = num_particles_x * distance
-    max_z_particles = z0 + num_particles_z * distance
+        # create container
+        container = create_container(
+            num_particles_x * distance, 1.1 * (z_piston + L_piston / 2)
+        )
+        container.name = "Container"
 
-    # add piston
-    z_piston, L_piston = generate_piston(L_container, max_z_particles)
-
-    # create container
-    container = create_container(
-        num_particles_x * distance, 1.1 * (z_piston + L_piston / 2)
-    )
-    container.name = "Container"
-
-    bake_and_export(end_frame=230, container=container)
-
-
-def generate_piston(L_container, max_z_particles):
-    slack = PARAMETERS.get("container_piston_slack",0.0)
-    L_piston = (1 - slack) * L_container
-    z_piston = 1.1 * max_z_particles + L_piston / 2
-    bpy.ops.mesh.primitive_cube_add(
-        size=L_piston,
-        enter_editmode=False,
-        align='WORLD',
-        location=(0, 0, z_piston),
-        scale=(1, 1, 1))
-    piston = bpy.context.active_object
-    bpy.ops.rigidbody.object_add(type="ACTIVE")
-    piston.rigid_body.friction = 0  # piston does not lose velocity when colliding
-    piston.rigid_body.restitution = 0  # piston does not bounce when colliding
-    piston.rigid_body.mass = PARAMETERS["mass_piston"]
-    piston.name = "Piston"
-
-    return z_piston, L_piston
-
+        bake_and_export(parameters,end_frame=230, container=container)
 
 if __name__ == "__main__":
-    main()
+    PackingSimulation(PARAMETERS).run()
