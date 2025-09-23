@@ -115,15 +115,14 @@ def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> i
     return math.ceil(N_B)
 
 
-def create_container_without_top_face(
-        side: float, height: float, thickness: float
+def create_container(
+        side: float, height: float
 ) -> Any:
     """Create an open cube-like container of given side length and height.
 
     Args:
         side (float): The length of the sides of the cube.
         height (float): The height of the container.
-        thickness (float): The thickness of the container walls.
 
     """
     height_to_side_scale = height / side
@@ -149,7 +148,8 @@ def create_container_without_top_face(
     bpy.ops.object.mode_set(mode="OBJECT")
 
     modifier = cube.modifiers.new(name="Solidify", type="SOLIDIFY")
-    modifier.thickness = thickness
+
+    modifier.thickness = PARAMETERS.get("container_wall_thickness",-0.2)
 
     bpy.ops.rigidbody.object_add(type="PASSIVE")
     cube.rigid_body.collision_shape = "MESH"
@@ -315,6 +315,8 @@ PARAMETERS = {
     "particle_friction": 0.8,  # fraction of velocity that is lost after collision
     "particle_damping": 0.8,  # fraction of linear velocity that is lost over time
     "save_files": False,
+    "container_wall_thickness": -0.2,
+    "container_piston_slack": 0.1
 }
 
 COMBINATION_RED = arr.array("d", [0.1, 0.8])
@@ -355,10 +357,22 @@ def main() -> None:
                     n_generated_particles_B += 1
 
     L_container = num_particles_x * distance
-    slack = 0.25
     max_z_particles = z0 + num_particles_z * distance
 
     # add piston
+    z_piston, L_piston = generate_piston(L_container, max_z_particles)
+
+    # create container
+    container = create_container(
+        num_particles_x * distance, 1.1 * (z_piston + L_piston / 2)
+    )
+    container.name = "Container"
+
+    bake_and_export(end_frame=230, container=container)
+
+
+def generate_piston(L_container, max_z_particles):
+    slack = PARAMETERS.get("container_piston_slack",0.0)
     L_piston = (1 - slack) * L_container
     z_piston = 1.1 * max_z_particles + L_piston / 2
     bpy.ops.mesh.primitive_cube_add(
@@ -367,24 +381,14 @@ def main() -> None:
         align='WORLD',
         location=(0, 0, z_piston),
         scale=(1, 1, 1))
-
     piston = bpy.context.active_object
-
     bpy.ops.rigidbody.object_add(type="ACTIVE")
     piston.rigid_body.friction = 0  # piston does not lose velocity when colliding
     piston.rigid_body.restitution = 0  # piston does not bounce when colliding
     piston.rigid_body.mass = PARAMETERS["mass_piston"]
     piston.name = "Piston"
 
-    thickness = -0.2
-
-    # create container
-    container = create_container_without_top_face(
-        num_particles_x * distance, 1.1 * (z_piston + L_piston / 2), thickness
-    )
-    container.name = "Container"
-
-    bake_and_export(end_frame=230, container=container)
+    return z_piston, L_piston
 
 
 if __name__ == "__main__":
