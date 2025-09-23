@@ -26,6 +26,7 @@ from enum import IntEnum
 import os
 import bpy
 
+
 class ParticleType(IntEnum):
     INVALID = -1
     A = 0
@@ -71,8 +72,6 @@ def load_parameters(
         if params.get("seed") is None:
             params["seed"] = random.random() * 1e6
         return params
-
-
 
 
 def volume_prism(sides: float, radius: float, height: float) -> float:
@@ -207,7 +206,6 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
         obj = bpy.data.objects[container.name]
         bpy.data.objects.remove(obj, do_unlink=True)
 
-
     # export STL with the correct operator
     if PARAMETERS.get("save_files", True):
         if stl_path is not None:
@@ -219,12 +217,20 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
         bpy.ops.wm.quit_blender()
 
 
-def decide_particle_type(cum_sums: list[float]) -> ParticleType:
+def decide_particle_type() -> ParticleType:
     """Decide which cube type to generate."""
+
+    num_cubes_x = int(PARAMETERS["num_cubes_x"])  # Number of cubes along the X axis
+    num_cubes_y = int(PARAMETERS["num_cubes_y"])  # Number of cubes along the Y axis
+    num_cubes_z = int(PARAMETERS["num_cubes_z"])  # Number of cubes along the Z axis
+    num_cubes_total = num_cubes_x * num_cubes_y * num_cubes_z
+    num_cubes_B = num_B_particles(PARAMETERS, num_cubes_total)
+    number_fraction_B = num_cubes_B / num_cubes_total
     rnd = random.uniform(0.0, 1.0)
     particle_type = ParticleType.A
 
-    if rnd > cum_sums[ParticleType.A]:
+    number_fraction_A = 1 - number_fraction_B
+    if rnd > number_fraction_A:
         # if we are supposed to generate only 20% of A,
         # and we randomly select a number bigger than that,
         # then we must generate the other type
@@ -233,16 +239,23 @@ def decide_particle_type(cum_sums: list[float]) -> ParticleType:
     return particle_type
 
 
-def generate_particle(cum_sums, distance, heights, n_generated_cubed_A, n_generated_cubes_B, n_sides, num_cubes_x,
-                      num_cubes_y, radii, scale, x, y, z, z0):
-    particle_type = decide_particle_type(cum_sums)
+def generate_particle(x, y, z, z0) -> ParticleType:
+    particle_type = decide_particle_type()
+
     if particle_type == ParticleType.B:
-        n_generated_cubes_B += 1
         density = PARAMETERS["density_B"]
     else:
-        n_generated_cubed_A += 1
         density = PARAMETERS["density_A"]
+
+    distance = PARAMETERS["distance"]  # Distance between the cubes
+    radii = arr.array("d", [PARAMETERS["r_A"], PARAMETERS["r_B"]])
+    heights = arr.array("d", [PARAMETERS["thickness_A"], PARAMETERS["thickness_B"]])
+    n_sides = PARAMETERS["num_sides"]
+    scale = PARAMETERS["scale"]
     particle_volume = volume_prism(n_sides, scale * radii[particle_type], scale * heights[particle_type])
+    num_cubes_x = int(PARAMETERS["num_cubes_x"])  # Number of cubes along the X axis
+    num_cubes_y = int(PARAMETERS["num_cubes_y"])  # Number of cubes along the Y axis
+
     bpy.ops.mesh.primitive_cylinder_add(
         vertices=n_sides,
         radius=scale * radii[particle_type],
@@ -278,6 +291,9 @@ def generate_particle(cum_sums, distance, heights, n_generated_cubed_A, n_genera
     mat.specular_intensity = 0
     particle.active_material = mat
 
+    return particle_type
+
+
 PARAMETERS = {
     "seed": None,
     "scale": 1.0,
@@ -287,7 +303,7 @@ PARAMETERS = {
     "thickness_A": 0.0871,
     "density_B": 15.1,
     "density_A": 5.1,
-    "mass_fraction_B": 0.05,
+    "mass_fraction_B": 0.20,
     "num_cubes_x": 2,
     "num_cubes_y": 2,
     "num_cubes_z": 25,
@@ -306,54 +322,37 @@ COMBINATION_GREEN = arr.array("d", [0.8, 0.4])
 COMBINATION_BLUE = arr.array("d", [0.7, 0.7])
 
 
-
 def main() -> None:
     """Main function to run the particle packing simulation."""  # noqa: D401
-    scale = PARAMETERS["scale"]
 
-    radii = arr.array("d", [PARAMETERS["r_A"], PARAMETERS["r_B"]])
-    heights = arr.array("d", [PARAMETERS["thickness_A"], PARAMETERS["thickness_B"]])
 
     num_cubes_x = int(PARAMETERS["num_cubes_x"])  # Number of cubes along the X axis
     num_cubes_y = int(PARAMETERS["num_cubes_y"])  # Number of cubes along the Y axis
     num_cubes_z = int(PARAMETERS["num_cubes_z"])  # Number of cubes along the Z axis
-    num_cubes_total = num_cubes_x * num_cubes_y * num_cubes_z
-    num_cubes_B = num_B_particles(PARAMETERS, num_cubes_total)
-    number_fraction_B = num_cubes_B / num_cubes_total
+
     distance = PARAMETERS["distance"]  # Distance between the cubes
     seed = PARAMETERS["seed"]
 
     z0 = distance / 2
-    number_fractions = [1.0 - number_fraction_B, number_fraction_B]
-    cum_sums = [0.0, 0.0]
-
 
     random.seed(seed)  # Optional: set a seed for reproducible results
-    the_sum = sum(number_fractions)
-
-    # Normalize array
-    for i in range(len(number_fractions)):
-        number_fractions[i] = number_fractions[i] / the_sum
-
-    # Cumulative Sum
-    cum_sum = 0.0
-    for i in range(len(number_fractions)):
-        cum_sum = cum_sum + number_fractions[i]
-        cum_sums[i] = cum_sum
 
     # Delete all existing mesh objects
     bpy.ops.object.select_all(action="DESELECT")
     bpy.ops.object.select_by_type(type="MESH")
     bpy.ops.object.delete()
 
-    n_sides = PARAMETERS["num_sides"]
     n_generated_cubes_B = 0
-    n_generated_cubed_A = 0
+    n_generated_cubes_A = 0
     for x in range(num_cubes_x):
         for y in range(num_cubes_y):
             for z in range(num_cubes_z):
-                generate_particle(cum_sums, distance, heights, n_generated_cubed_A, n_generated_cubes_B, n_sides,
-                                  num_cubes_x, num_cubes_y, radii, scale, x, y, z, z0)
+                generated_particle_type = generate_particle(
+                    x, y, z, z0)
+                if generated_particle_type == ParticleType.A:
+                    n_generated_cubes_A += 1
+                else:
+                    n_generated_cubes_B += 1
 
     L_container = num_cubes_x * distance
     slack = 0.25
@@ -386,9 +385,6 @@ def main() -> None:
     container.name = "Container"
 
     bake_and_export(end_frame=230, container=container)
-
-
-
 
 
 if __name__ == "__main__":
