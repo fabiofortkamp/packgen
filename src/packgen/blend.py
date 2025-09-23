@@ -104,11 +104,67 @@ class Particle:
 
 
 class Container:
-    pass
+    def __init__(self,
+                 side: float, height: float
+                 ) -> None:
+        """Create an open cube-like container of given side length and height.
+
+        Args:
+            side (float): The length of the sides of the cube.
+            height (float): The height of the container.
+
+        """
+        height_to_side_scale = height / side
+        bpy.ops.mesh.primitive_cube_add(
+            size=side,
+            enter_editmode=False,
+            location=(0, 0, height / 2),
+            scale=(1, 1, height_to_side_scale),
+        )
+        cube = bpy.context.active_object
+
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.mesh.select_mode(type="FACE")
+
+        bpy.ops.object.mode_set(mode="OBJECT")
+        top_face = [face for face in cube.data.polygons if face.normal.z > 0.9]
+        for face in top_face:
+            face.select = True
+
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.delete(type="FACE")
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+        modifier = cube.modifiers.new(name="Solidify", type="SOLIDIFY")
+
+        modifier.thickness = PARAMETERS.get("container_wall_thickness", -0.2)
+
+        bpy.ops.rigidbody.object_add(type="PASSIVE")
+        cube.rigid_body.collision_shape = "MESH"
+        cube.name = "Container"
+        self.name = cube.name
 
 
 class Piston:
-    pass
+    def __init__(self, L_container, max_z_particles, parameters) -> None:
+        slack = PARAMETERS.get("container_piston_slack", 0.0)
+        L_piston = (1 - slack) * L_container
+        z_piston = 1.1 * max_z_particles + L_piston / 2
+        bpy.ops.mesh.primitive_cube_add(
+            size=L_piston,
+            enter_editmode=False,
+            align='WORLD',
+            location=(0, 0, z_piston),
+            scale=(1, 1, 1))
+        piston = bpy.context.active_object
+        bpy.ops.rigidbody.object_add(type="ACTIVE")
+        piston.rigid_body.friction = 0  # piston does not lose velocity when colliding
+        piston.rigid_body.restitution = 0  # piston does not bounce when colliding
+        piston.rigid_body.mass = parameters["mass_piston"]
+        piston.name = "Piston"
+        self.z = z_piston
+        self.L = L_piston
 
 
 def get_parameters_file() -> str:
@@ -193,127 +249,14 @@ def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> i
     return math.ceil(N_B)
 
 
-def create_container(
-        side: float, height: float
-) -> Any:
-    """Create an open cube-like container of given side length and height.
-
-    Args:
-        side (float): The length of the sides of the cube.
-        height (float): The height of the container.
-
-    """
-    height_to_side_scale = height / side
-    bpy.ops.mesh.primitive_cube_add(
-        size=side,
-        enter_editmode=False,
-        location=(0, 0, height / 2),
-        scale=(1, 1, height_to_side_scale),
-    )
-    cube = bpy.context.active_object
-
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="DESELECT")
-    bpy.ops.mesh.select_mode(type="FACE")
-
-    bpy.ops.object.mode_set(mode="OBJECT")
-    top_face = [face for face in cube.data.polygons if face.normal.z > 0.9]
-    for face in top_face:
-        face.select = True
-
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.delete(type="FACE")
-    bpy.ops.object.mode_set(mode="OBJECT")
-
-    modifier = cube.modifiers.new(name="Solidify", type="SOLIDIFY")
-
-    modifier.thickness = PARAMETERS.get("container_wall_thickness", -0.2)
-
-    bpy.ops.rigidbody.object_add(type="PASSIVE")
-    cube.rigid_body.collision_shape = "MESH"
-
-    return cube
 
 
-def bake_and_export(parameters, end_frame: int = 230, container: Any = None, ) -> None:
-    """Bake the physics simulation and export the results.
-
-    Args:
-        parameters: The parameters of the packing simulation
-        end_frame (int): The last frame to bake the simulation to.
-            Defaults to 230.
-        container: The container of the particles that should be removed.
-            If None, no object will be removed.
-
-    """
-
-    scene = bpy.context.scene
-    # set the frame range
-    scene.frame_start = 1
-    scene.frame_end = end_frame
-
-    # setting gravity
-    g = parameters.get("gravity_field", [0, 0, -9.8])
-    scene.gravity = g
-
-    # free any old bake, then bake all caches
-    if scene.rigidbody_world:
-        bpy.ops.ptcache.free_bake_all()
-        bpy.ops.ptcache.bake_all()
-
-    # step to the last frame so all transforms are final
-    scene.frame_set(end_frame)
-
-    # Use the current working directory for all output files
-    stl_path: Path | None = None
-    if parameters.get("save_files", True):
-        output_dir = Path(os.getcwd())
-        suffix = get_params_suffix()
-        blend_path = output_dir / f"packing_{suffix}.blend"
-        json_path = output_dir / f"packing_{suffix}.json"
-        stl_path = output_dir / f"packing_{suffix}.stl"
-
-        bpy.ops.wm.save_mainfile(filepath=str(blend_path))
-
-        with open(json_path, mode="w") as f:
-            json.dump(parameters, f)
-
-    # the container deletion should occur after the main saving above
-    # to be able to inspect the Blender file
-    if container and container.name in bpy.data.objects:
-        # Method A: use the data API
-        obj = bpy.data.objects[container.name]
-        bpy.data.objects.remove(obj, do_unlink=True)
-
-    # export STL with the correct operator
-    if parameters.get("save_files", True):
-        if stl_path is not None:
-            bpy.ops.wm.stl_export(filepath=str(stl_path))
-        # if it is None, then something wrong happened and,
-        # to avoid crashing, we simply don't save
-
-    if parameters.get("quit_on_finish", False):
-        bpy.ops.wm.quit_blender()
 
 
-def generate_piston(L_container, max_z_particles, parameters):
-    slack = PARAMETERS.get("container_piston_slack", 0.0)
-    L_piston = (1 - slack) * L_container
-    z_piston = 1.1 * max_z_particles + L_piston / 2
-    bpy.ops.mesh.primitive_cube_add(
-        size=L_piston,
-        enter_editmode=False,
-        align='WORLD',
-        location=(0, 0, z_piston),
-        scale=(1, 1, 1))
-    piston = bpy.context.active_object
-    bpy.ops.rigidbody.object_add(type="ACTIVE")
-    piston.rigid_body.friction = 0  # piston does not lose velocity when colliding
-    piston.rigid_body.restitution = 0  # piston does not bounce when colliding
-    piston.rigid_body.mass = parameters["mass_piston"]
-    piston.name = "Piston"
 
-    return z_piston, L_piston
+
+
+
 
 
 PARAMETERS = {
@@ -357,27 +300,35 @@ class PackingSimulation:
     def run(self):
         """Run the particle packing simulation."""  # noqa: D401
 
-        parameters = self.parameters
-
         self._initialize_particles()
 
+        piston = self._initialize_piston()
+        container = self._initialize_container(piston)
+
+        self.bake_and_export(end_frame=230, container=container)
+
+    def _initialize_piston(self) -> Piston:
+        parameters = self.parameters
         num_particles_x = int(parameters["num_particles_x"])  # Number of cubes along the X axis
         num_particles_z = int(parameters["num_particles_z"])  # Number of cubes along the Y axis
         distance = parameters["distance"]  # Distance between the cubes
         L_container = num_particles_x * distance
         z0 = distance / 2
         max_z_particles = z0 + num_particles_z * distance
-
         # add piston
-        z_piston, L_piston = generate_piston(L_container, max_z_particles, parameters)
+        piston = Piston(L_container,max_z_particles,parameters)
+        return piston
 
+    def _initialize_container(self,piston) -> Container:
         # create container
-        container = create_container(
-            num_particles_x * distance, 1.1 * (z_piston + L_piston / 2)
-        )
-        container.name = "Container"
-
-        bake_and_export(parameters, end_frame=230, container=container)
+        z_piston = piston.z
+        L_piston = piston.L
+        num_particles_x = self.parameters["num_particles_x"]
+        distance = self.parameters["distance"]
+        Lxy = num_particles_x * distance
+        Lz = 1.1 * (z_piston + L_piston / 2)
+        container = Container(Lxy,Lz)
+        return container
 
     def _initialize_particles(self):
         n_generated_particles_B = 0
@@ -411,6 +362,66 @@ class PackingSimulation:
     def _initialize_random_state(self):
         seed = self.parameters["seed"]
         random.seed(seed)
+
+    def bake_and_export(self, end_frame: int = 230, container: Any = None, ) -> None:
+        """Bake the physics simulation and export the results.
+
+        Args:
+            end_frame (int): The last frame to bake the simulation to.
+                Defaults to 230.
+            container: The container of the particles that should be removed.
+                If None, no object will be removed.
+
+        """
+
+        scene = bpy.context.scene
+        # set the frame range
+        scene.frame_start = 1
+        scene.frame_end = end_frame
+
+        # setting gravity
+        parameters = self.parameters
+        g = parameters.get("gravity_field", [0, 0, -9.8])
+        scene.gravity = g
+
+        # free any old bake, then bake all caches
+        if scene.rigidbody_world:
+            bpy.ops.ptcache.free_bake_all()
+            bpy.ops.ptcache.bake_all()
+
+        # step to the last frame so all transforms are final
+        scene.frame_set(end_frame)
+
+        # Use the current working directory for all output files
+        stl_path: Path | None = None
+        if parameters.get("save_files", True):
+            output_dir = Path(os.getcwd())
+            suffix = get_params_suffix()
+            blend_path = output_dir / f"packing_{suffix}.blend"
+            json_path = output_dir / f"packing_{suffix}.json"
+            stl_path = output_dir / f"packing_{suffix}.stl"
+
+            bpy.ops.wm.save_mainfile(filepath=str(blend_path))
+
+            with open(json_path, mode="w") as f:
+                json.dump(parameters, f)
+
+        # the container deletion should occur after the main saving above
+        # to be able to inspect the Blender file
+        if container and container.name in bpy.data.objects:
+            # Method A: use the data API
+            obj = bpy.data.objects[container.name]
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+        # export STL with the correct operator
+        if parameters.get("save_files", True):
+            if stl_path is not None:
+                bpy.ops.wm.stl_export(filepath=str(stl_path))
+            # if it is None, then something wrong happened and,
+            # to avoid crashing, we simply don't save
+
+        if parameters.get("quit_on_finish", False):
+            bpy.ops.wm.quit_blender()
 
 
 if __name__ == "__main__":
