@@ -258,7 +258,7 @@ class Piston:
 
 
 PARAMETERS = {
-    "seed": None,
+    "seed": 42,
     "scale": 1.0,
     "r_B": 0.0295,
     "r_A": 0.1,
