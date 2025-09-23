@@ -207,7 +207,7 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     if PARAMETERS.get("save_files", True):
         output_dir = Path(os.getcwd())
         suffix = get_params_suffix()
-        blend_path = output_dir / f"packing_{suffix}.blender"
+        blend_path = output_dir / f"packing_{suffix}.blend"
         json_path = output_dir / f"packing_{suffix}.json"
         stl_path = output_dir / f"packing_{suffix}.stl"
 
