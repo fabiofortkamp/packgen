@@ -269,7 +269,7 @@ PARAMETERS = {
     "mass_fraction_B": 0.20,
     "num_particles_x": 2,
     "num_particles_y": 2,
-    "num_particles_z": 60,
+    "num_particles_z": 200,
     "num_sides": 6,
     "distance": 0.6,
     "quit_on_finish": False,
@@ -279,8 +279,9 @@ PARAMETERS = {
     "particle_damping": 0.8,  # fraction of linear velocity that is lost over time
     "save_files": False,
     "container_wall_thickness": -0.2,
-    "container_piston_slack": 0.1,
-    "gravity_field": [0, 0, -5],
+    "container_piston_slack": 0.01,
+    "gravity_field": [0, 0, -9.8],
+    "end_frame":250,
 }
 
 COMBINATION_RED = arr.array("d", [0.1, 0.8])
@@ -304,7 +305,7 @@ class PackingSimulation:
         piston = self._initialize_piston()
         container = self._initialize_container(piston)
 
-        self.bake_and_export(end_frame=230, container=container)
+        self.bake_and_export(end_frame=self.parameters["end_frame"], container=container)
 
     def _initialize_piston(self) -> Piston:
         parameters = self.parameters
@@ -362,12 +363,11 @@ class PackingSimulation:
         seed = self.parameters["seed"]
         random.seed(seed)
 
-    def bake_and_export(self, end_frame: int = 230, container: Any = None, ) -> None:
+    def bake_and_export(self, end_frame: int, container: Any = None, ) -> None:
         """Bake the physics simulation and export the results.
 
         Args:
             end_frame (int): The last frame to bake the simulation to.
-                Defaults to 230.
             container: The container of the particles that should be removed.
                 If None, no object will be removed.
 
