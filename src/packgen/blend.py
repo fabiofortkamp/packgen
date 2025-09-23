@@ -21,9 +21,15 @@ import random
 from typing import Any
 import sys
 from pathlib import Path
+from enum import IntEnum
 
 import os
 import bpy
+
+class ParticleType(IntEnum):
+    INVALID = -1
+    A = 0
+    B = 1
 
 
 def get_parameters_file() -> str:
@@ -67,28 +73,6 @@ def load_parameters(
         return params
 
 
-PARAMETERS = {
-    "seed": None,
-    "scale": 1.0,
-    "r_B": 0.0295,
-    "r_A": 0.1,
-    "thickness_B": 0.027,
-    "thickness_A": 0.0871,
-    "density_B": 15.1,
-    "density_A": 5.1,
-    "mass_fraction_B": 0.05,
-    "num_cubes_x": 2,
-    "num_cubes_y": 2,
-    "num_cubes_z": 25,
-    "num_sides": 6,
-    "distance": 0.28,
-    "quit_on_finish": False,
-    "mass_piston": 1,
-    "particle_restitution": 0.5,  # how much objects bounce after collision
-    "particle_friction": 0.8,  # fraction of velocity that is lost after collision
-    "particle_damping": 0.8,  # fraction of linear velocity that is lost over time
-    "save_files": False,
-}
 
 
 def volume_prism(sides: float, radius: float, height: float) -> float:
@@ -235,25 +219,97 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
         bpy.ops.wm.quit_blender()
 
 
-def decide_cube(
-        n_B: int, n_A: int, number_fractions: list[float], cum_sums: list[float]
-) -> int:
-    """Decide which cube type to generate, based on how many were generated."""
-    ThisRandomNumber = random.uniform(0.0, 1.0)
-    LastI = -1
-    for i in range(len(number_fractions)):
-        if ThisRandomNumber > cum_sums[i]:
-            LastI = i
-    LastI = LastI + 1
-    return LastI
+def decide_particle_type(cum_sums: list[float]) -> ParticleType:
+    """Decide which cube type to generate."""
+    rnd = random.uniform(0.0, 1.0)
+    particle_type = ParticleType.A
+
+    if rnd > cum_sums[ParticleType.A]:
+        # if we are supposed to generate only 20% of A,
+        # and we randomly select a number bigger than that,
+        # then we must generate the other type
+        particle_type = ParticleType.B
+
+    return particle_type
+
+
+def generate_particle(cum_sums, distance, heights, n_generated_cubed_A, n_generated_cubes_B, n_sides, num_cubes_x,
+                      num_cubes_y, radii, scale, x, y, z, z0):
+    particle_type = decide_particle_type(cum_sums)
+    if particle_type == ParticleType.B:
+        n_generated_cubes_B += 1
+        density = PARAMETERS["density_B"]
+    else:
+        n_generated_cubed_A += 1
+        density = PARAMETERS["density_A"]
+    particle_volume = volume_prism(n_sides, scale * radii[particle_type], scale * heights[particle_type])
+    bpy.ops.mesh.primitive_cylinder_add(
+        vertices=n_sides,
+        radius=scale * radii[particle_type],
+        depth=scale * heights[particle_type],
+        enter_editmode=False,
+        location=(
+            (x - num_cubes_x / 2 + 0.5) * distance,
+            (y - num_cubes_y / 2 + 0.5) * distance,
+            z0 + z * distance,
+        ),
+    )
+    # Get the active object (the newly created particle)
+    particle = bpy.context.active_object
+    # Assign a random rotation to the cube
+    particle.rotation_euler = (
+        random.uniform(0, 6.283185),
+        random.uniform(0, 6.283185),
+        random.uniform(0, 6.283185),
+    )
+    # Add rigid body physics to the particle
+    bpy.ops.rigidbody.object_add(type="ACTIVE")
+    particle.rigid_body.friction = PARAMETERS["particle_friction"]
+    particle.rigid_body.restitution = PARAMETERS["particle_restitution"]
+    particle.rigid_body.mass = density * particle_volume
+    particle.rigid_body.linear_damping = PARAMETERS["particle_damping"]
+    mat = bpy.data.materials.new("GenericMaterial")
+    mat.diffuse_color = (
+        float(COMBINATION_RED[particle_type]),
+        float(COMBINATION_GREEN[particle_type]),
+        float(COMBINATION_BLUE[particle_type]),
+        1.0,
+    )
+    mat.specular_intensity = 0
+    particle.active_material = mat
+
+PARAMETERS = {
+    "seed": None,
+    "scale": 1.0,
+    "r_B": 0.0295,
+    "r_A": 0.1,
+    "thickness_B": 0.027,
+    "thickness_A": 0.0871,
+    "density_B": 15.1,
+    "density_A": 5.1,
+    "mass_fraction_B": 0.05,
+    "num_cubes_x": 2,
+    "num_cubes_y": 2,
+    "num_cubes_z": 25,
+    "num_sides": 6,
+    "distance": 0.28,
+    "quit_on_finish": False,
+    "mass_piston": 1,
+    "particle_restitution": 0.5,  # how much objects bounce after collision
+    "particle_friction": 0.8,  # fraction of velocity that is lost after collision
+    "particle_damping": 0.8,  # fraction of linear velocity that is lost over time
+    "save_files": False,
+}
+
+COMBINATION_RED = arr.array("d", [0.1, 0.8])
+COMBINATION_GREEN = arr.array("d", [0.8, 0.4])
+COMBINATION_BLUE = arr.array("d", [0.7, 0.7])
+
 
 
 def main() -> None:
     """Main function to run the particle packing simulation."""  # noqa: D401
     scale = PARAMETERS["scale"]
-
-    # convention for indices for the "A" and "non-A" particles
-    I_B = 1
 
     radii = arr.array("d", [PARAMETERS["r_A"], PARAMETERS["r_B"]])
     heights = arr.array("d", [PARAMETERS["thickness_A"], PARAMETERS["thickness_B"]])
@@ -270,9 +326,7 @@ def main() -> None:
     z0 = distance / 2
     number_fractions = [1.0 - number_fraction_B, number_fraction_B]
     cum_sums = [0.0, 0.0]
-    CombinationRed = arr.array("d", [0.1, 0.8])
-    CombinationGreen = arr.array("d", [0.8, 0.4])
-    CombinationBlue = arr.array("d", [0.7, 0.7])
+
 
     random.seed(seed)  # Optional: set a seed for reproducible results
     the_sum = sum(number_fractions)
@@ -298,59 +352,8 @@ def main() -> None:
     for x in range(num_cubes_x):
         for y in range(num_cubes_y):
             for z in range(num_cubes_z):
-                LastI = decide_cube(
-                    n_generated_cubes_B, n_generated_cubed_A, number_fractions, cum_sums
-                )
-
-                if LastI == I_B:
-                    n_generated_cubes_B += 1
-                    density = PARAMETERS["density_B"]
-
-                else:
-                    n_generated_cubed_A += 1
-                    density = PARAMETERS["density_A"]
-
-                particle_volume = volume_prism(n_sides, scale * radii[LastI], scale * heights[LastI])
-
-                bpy.ops.mesh.primitive_cylinder_add(
-                    vertices=n_sides,
-                    radius=scale * radii[LastI],
-                    depth=scale * heights[LastI],
-                    enter_editmode=False,
-                    location=(
-                        (x - num_cubes_x / 2 + 0.5) * distance,
-                        (y - num_cubes_y / 2 + 0.5) * distance,
-                        z0 + z * distance,
-                    ),
-                )
-
-                # Get the active object (the newly created particle)
-                particle = bpy.context.active_object
-
-                # Assign a random rotation to the cube
-                particle.rotation_euler = (
-                    random.uniform(0, 6.283185),
-                    random.uniform(0, 6.283185),
-                    random.uniform(0, 6.283185),
-                )
-
-                # Add rigid body physics to the particle
-                bpy.ops.rigidbody.object_add(type="ACTIVE")
-                particle.rigid_body.friction = PARAMETERS["particle_friction"]
-                particle.rigid_body.restitution = PARAMETERS["particle_restitution"]
-                particle.rigid_body.mass = density * particle_volume
-                particle.rigid_body.linear_damping = PARAMETERS["particle_damping"]
-
-                mat = bpy.data.materials.new("GenericMaterial")
-                mat.diffuse_color = (
-                    float(CombinationRed[LastI]),
-                    float(CombinationGreen[LastI]),
-                    float(CombinationBlue[LastI]),
-                    1.0,
-                )
-                mat.specular_intensity = 0
-
-                particle.active_material = mat
+                generate_particle(cum_sums, distance, heights, n_generated_cubed_A, n_generated_cubes_B, n_sides,
+                                  num_cubes_x, num_cubes_y, radii, scale, x, y, z, z0)
 
     L_container = num_cubes_x * distance
     slack = 0.25
@@ -383,6 +386,9 @@ def main() -> None:
     container.name = "Container"
 
     bake_and_export(end_frame=230, container=container)
+
+
+
 
 
 if __name__ == "__main__":
