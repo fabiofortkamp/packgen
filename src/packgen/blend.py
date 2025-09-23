@@ -36,6 +36,16 @@ def get_parameters_file() -> str:
     return parameters_file
 
 
+def get_params_suffix() -> str:
+    """Get the base name of the parameters file without extension to use as a suffix.
+
+    Returns:
+        str: The base name of the parameters file without extension.
+
+    """
+    return Path(get_parameters_file()).stem
+
+
 def load_parameters(
         parameters_file: str = "parameters.json",
 ) -> dict[str, float | bool]:
@@ -77,6 +87,7 @@ PARAMETERS = {
     "particle_restitution": 0.5,  # how much objects bounce after collision
     "particle_friction": 0.8,  # fraction of velocity that is lost after collision
     "particle_damping": 0.8,  # fraction of linear velocity that is lost over time
+    "save_files": False,
 }
 
 
@@ -163,27 +174,14 @@ def create_container_without_top_face(
     return cube
 
 
-#def get_params_suffix() -> str:
-#    """Get the base name of the parameters file without extension to use as a suffix.
-
-#    Returns:
-#        str: The base name of the parameters file without extension.
-
-#    """
-#    return Path(get_parameters_file()).stem
-
-def get_params_suffix() -> str:
-    return "parameters"
-
-
 def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     """Bake the physics simulation and export the results.
 
     Args:
         end_frame (int): The last frame to bake the simulation to.
             Defaults to 230.
-        container: The container object to be used in the simulation.
-            If None, no container will be created.
+        container: The container of the particles that should be removed.
+            If None, no object will be removed.
 
     """
 
@@ -205,24 +203,29 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     scene.frame_set(end_frame)
 
     # Use the current working directory for all output files
-    output_dir = Path(os.getcwd())
-    suffix = get_params_suffix()
-    blend_path = output_dir / f"packing_{suffix}.blender"
-    json_path = output_dir / f"packing_{suffix}.json"
-    stl_path = output_dir / f"packing_{suffix}.stl"
+    if PARAMETERS.get("save_files", True):
+        output_dir = Path(os.getcwd())
+        suffix = get_params_suffix()
+        blend_path = output_dir / f"packing_{suffix}.blender"
+        json_path = output_dir / f"packing_{suffix}.json"
+        stl_path = output_dir / f"packing_{suffix}.stl"
 
-    bpy.ops.wm.save_mainfile(filepath=str(blend_path))
+        bpy.ops.wm.save_mainfile(filepath=str(blend_path))
 
-    with open(json_path, mode="w") as f:
-        json.dump(PARAMETERS, f)
+        with open(json_path, mode="w") as f:
+            json.dump(PARAMETERS, f)
 
+    # the container deletion should occur after the main saving above
+    # to be able to inspect the Blender file
     if container and container.name in bpy.data.objects:
         # Method A: use the data API
         obj = bpy.data.objects[container.name]
         bpy.data.objects.remove(obj, do_unlink=True)
+
+
     # export STL with the correct operator
-    print("Exporting STL to", stl_path)
-    bpy.ops.wm.stl_export(filepath=str(stl_path))
+    if PARAMETERS.get("save_files", True):
+        bpy.ops.wm.stl_export(filepath=str(stl_path))
 
     if PARAMETERS.get("quit_on_finish", False):
         bpy.ops.wm.quit_blender()
@@ -350,7 +353,7 @@ def main() -> None:
     max_z_particles = z0 + num_cubes_z * distance
 
     # add piston
-    L_piston = (1-slack) * L_container
+    L_piston = (1 - slack) * L_container
     z_piston = 1.1 * max_z_particles + L_piston / 2
     bpy.ops.mesh.primitive_cube_add(
         size=L_piston,
