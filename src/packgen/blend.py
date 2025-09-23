@@ -203,6 +203,7 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
     scene.frame_set(end_frame)
 
     # Use the current working directory for all output files
+    stl_path: Path | None = None
     if PARAMETERS.get("save_files", True):
         output_dir = Path(os.getcwd())
         suffix = get_params_suffix()
@@ -225,7 +226,10 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
 
     # export STL with the correct operator
     if PARAMETERS.get("save_files", True):
-        bpy.ops.wm.stl_export(filepath=str(stl_path))
+        if stl_path is not None:
+            bpy.ops.wm.stl_export(filepath=str(stl_path))
+        # if it is None, then something wrong happened and,
+        # to avoid crashing, we simply don't save
 
     if PARAMETERS.get("quit_on_finish", False):
         bpy.ops.wm.quit_blender()
