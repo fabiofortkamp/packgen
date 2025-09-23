@@ -9,9 +9,9 @@
     "density_B": 15.1,
     "density_A": 5.1,
     "mass_fraction_B": 0.05,
-    "num_cubes_x": 4,
-    "num_cubes_y": 4,
-    "num_cubes_z": 65,
+    "num_particles_x": 4,
+    "num_particles_y": 4,
+    "num_particles_z": 65,
     "num_sides": 6,
     "distance": 0.25,
   "quit_on_finish": false

@@ -220,12 +220,12 @@ def bake_and_export(end_frame: int = 230, container: Any = None) -> None:
 def decide_particle_type() -> ParticleType:
     """Decide which cube type to generate."""
 
-    num_cubes_x = int(PARAMETERS["num_cubes_x"])  # Number of cubes along the X axis
-    num_cubes_y = int(PARAMETERS["num_cubes_y"])  # Number of cubes along the Y axis
-    num_cubes_z = int(PARAMETERS["num_cubes_z"])  # Number of cubes along the Z axis
-    num_cubes_total = num_cubes_x * num_cubes_y * num_cubes_z
-    num_cubes_B = num_B_particles(PARAMETERS, num_cubes_total)
-    number_fraction_B = num_cubes_B / num_cubes_total
+    num_particles_x = int(PARAMETERS["num_particles_x"])  # Number of cubes along the X axis
+    num_particles_y = int(PARAMETERS["num_particles_y"])  # Number of cubes along the Y axis
+    num_particles_z = int(PARAMETERS["num_particles_z"])  # Number of cubes along the Z axis
+    num_particles_total = num_particles_x * num_particles_y * num_particles_z
+    num_particles_B = num_B_particles(PARAMETERS, num_particles_total)
+    number_fraction_B = num_particles_B / num_particles_total
     rnd = random.uniform(0.0, 1.0)
     particle_type = ParticleType.A
 
@@ -253,8 +253,8 @@ def generate_particle(x, y, z, z0) -> ParticleType:
     n_sides = PARAMETERS["num_sides"]
     scale = PARAMETERS["scale"]
     particle_volume = volume_prism(n_sides, scale * radii[particle_type], scale * heights[particle_type])
-    num_cubes_x = int(PARAMETERS["num_cubes_x"])  # Number of cubes along the X axis
-    num_cubes_y = int(PARAMETERS["num_cubes_y"])  # Number of cubes along the Y axis
+    num_particles_x = int(PARAMETERS["num_particles_x"])  # Number of cubes along the X axis
+    num_particles_y = int(PARAMETERS["num_particles_y"])  # Number of cubes along the Y axis
 
     bpy.ops.mesh.primitive_cylinder_add(
         vertices=n_sides,
@@ -262,8 +262,8 @@ def generate_particle(x, y, z, z0) -> ParticleType:
         depth=scale * heights[particle_type],
         enter_editmode=False,
         location=(
-            (x - num_cubes_x / 2 + 0.5) * distance,
-            (y - num_cubes_y / 2 + 0.5) * distance,
+            (x - num_particles_x / 2 + 0.5) * distance,
+            (y - num_particles_y / 2 + 0.5) * distance,
             z0 + z * distance,
         ),
     )
@@ -304,9 +304,9 @@ PARAMETERS = {
     "density_B": 15.1,
     "density_A": 5.1,
     "mass_fraction_B": 0.20,
-    "num_cubes_x": 2,
-    "num_cubes_y": 2,
-    "num_cubes_z": 25,
+    "num_particles_x": 2,
+    "num_particles_y": 2,
+    "num_particles_z": 25,
     "num_sides": 6,
     "distance": 0.28,
     "quit_on_finish": False,
@@ -326,9 +326,9 @@ def main() -> None:
     """Main function to run the particle packing simulation."""  # noqa: D401
 
 
-    num_cubes_x = int(PARAMETERS["num_cubes_x"])  # Number of cubes along the X axis
-    num_cubes_y = int(PARAMETERS["num_cubes_y"])  # Number of cubes along the Y axis
-    num_cubes_z = int(PARAMETERS["num_cubes_z"])  # Number of cubes along the Z axis
+    num_particles_x = int(PARAMETERS["num_particles_x"])  # Number of cubes along the X axis
+    num_particles_y = int(PARAMETERS["num_particles_y"])  # Number of cubes along the Y axis
+    num_particles_z = int(PARAMETERS["num_particles_z"])  # Number of cubes along the Z axis
 
     distance = PARAMETERS["distance"]  # Distance between the cubes
     seed = PARAMETERS["seed"]
@@ -342,21 +342,21 @@ def main() -> None:
     bpy.ops.object.select_by_type(type="MESH")
     bpy.ops.object.delete()
 
-    n_generated_cubes_B = 0
-    n_generated_cubes_A = 0
-    for x in range(num_cubes_x):
-        for y in range(num_cubes_y):
-            for z in range(num_cubes_z):
+    n_generated_particles_B = 0
+    n_generated_particles_A = 0
+    for x in range(num_particles_x):
+        for y in range(num_particles_y):
+            for z in range(num_particles_z):
                 generated_particle_type = generate_particle(
                     x, y, z, z0)
                 if generated_particle_type == ParticleType.A:
-                    n_generated_cubes_A += 1
+                    n_generated_particles_A += 1
                 else:
-                    n_generated_cubes_B += 1
+                    n_generated_particles_B += 1
 
-    L_container = num_cubes_x * distance
+    L_container = num_particles_x * distance
     slack = 0.25
-    max_z_particles = z0 + num_cubes_z * distance
+    max_z_particles = z0 + num_particles_z * distance
 
     # add piston
     L_piston = (1 - slack) * L_container
@@ -380,7 +380,7 @@ def main() -> None:
 
     # create container
     container = create_container_without_top_face(
-        num_cubes_x * distance, 1.1 * (z_piston + L_piston / 2), thickness
+        num_particles_x * distance, 1.1 * (z_piston + L_piston / 2), thickness
     )
     container.name = "Container"
 
