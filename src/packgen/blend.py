@@ -32,14 +32,84 @@ class ParticleType(IntEnum):
     A = 0
     B = 1
 
+
 class Particle:
-    pass
+
+    def __init__(self, x: float, y: float, z: float, parameters) -> None:
+        self.parameters = parameters
+        particle_type = self.decide_particle_type()
+        self.type = particle_type
+        if self.type == ParticleType.B:
+            density = parameters["density_B"]
+        else:
+            density = parameters["density_A"]
+
+        radii = arr.array("d", [parameters["r_A"], parameters["r_B"]])
+        heights = arr.array("d", [parameters["thickness_A"], parameters["thickness_B"]])
+        n_sides = parameters["num_sides"]
+        scale = parameters["scale"]
+        particle_volume = volume_prism(n_sides, scale * radii[particle_type], scale * heights[particle_type])
+
+        bpy.ops.mesh.primitive_cylinder_add(
+            vertices=n_sides,
+            radius=scale * radii[particle_type],
+            depth=scale * heights[particle_type],
+            enter_editmode=False,
+            location=(x, y, z),
+        )
+        # Get the active object (the newly created particle)
+        particle = bpy.context.active_object
+        # Assign a random rotation to the cube
+        particle.rotation_euler = (
+            random.uniform(0, 6.283185),
+            random.uniform(0, 6.283185),
+            random.uniform(0, 6.283185),
+        )
+        # Add rigid body physics to the particle
+        bpy.ops.rigidbody.object_add(type="ACTIVE")
+        particle.rigid_body.friction = parameters["particle_friction"]
+        particle.rigid_body.restitution = parameters["particle_restitution"]
+        particle.rigid_body.mass = density * particle_volume
+        particle.rigid_body.linear_damping = parameters["particle_damping"]
+        mat = bpy.data.materials.new("GenericMaterial")
+        mat.diffuse_color = (
+            float(COMBINATION_RED[particle_type]),
+            float(COMBINATION_GREEN[particle_type]),
+            float(COMBINATION_BLUE[particle_type]),
+            1.0,
+        )
+        mat.specular_intensity = 0
+        particle.active_material = mat
+
+    def decide_particle_type(self) -> ParticleType:
+        """Decide which cube type to generate."""
+        parameters = self.parameters
+        num_particles_x = int(parameters["num_particles_x"])  # Number of cubes along the X axis
+        num_particles_y = int(parameters["num_particles_y"])  # Number of cubes along the Y axis
+        num_particles_z = int(parameters["num_particles_z"])  # Number of cubes along the Z axis
+        num_particles_total = num_particles_x * num_particles_y * num_particles_z
+        num_particles_B = num_B_particles(parameters, num_particles_total)
+        number_fraction_B = num_particles_B / num_particles_total
+        rnd = random.uniform(0.0, 1.0)
+        particle_type = ParticleType.A
+
+        number_fraction_A = 1 - number_fraction_B
+        if rnd > number_fraction_A:
+            # if we are supposed to generate only 20% of A,
+            # and we randomly select a number bigger than that,
+            # then we must generate the other type
+            particle_type = ParticleType.B
+
+        return particle_type
+
 
 class Container:
     pass
 
+
 class Piston:
     pass
+
 
 def get_parameters_file() -> str:
     """Parse argument lists and return parameters file name."""
@@ -157,7 +227,7 @@ def create_container(
 
     modifier = cube.modifiers.new(name="Solidify", type="SOLIDIFY")
 
-    modifier.thickness = PARAMETERS.get("container_wall_thickness",-0.2)
+    modifier.thickness = PARAMETERS.get("container_wall_thickness", -0.2)
 
     bpy.ops.rigidbody.object_add(type="PASSIVE")
     cube.rigid_body.collision_shape = "MESH"
@@ -226,84 +296,8 @@ def bake_and_export(parameters, end_frame: int = 230, container: Any = None, ) -
         bpy.ops.wm.quit_blender()
 
 
-def decide_particle_type(parameters) -> ParticleType:
-    """Decide which cube type to generate."""
-
-    num_particles_x = int(parameters["num_particles_x"])  # Number of cubes along the X axis
-    num_particles_y = int(parameters["num_particles_y"])  # Number of cubes along the Y axis
-    num_particles_z = int(parameters["num_particles_z"])  # Number of cubes along the Z axis
-    num_particles_total = num_particles_x * num_particles_y * num_particles_z
-    num_particles_B = num_B_particles(parameters, num_particles_total)
-    number_fraction_B = num_particles_B / num_particles_total
-    rnd = random.uniform(0.0, 1.0)
-    particle_type = ParticleType.A
-
-    number_fraction_A = 1 - number_fraction_B
-    if rnd > number_fraction_A:
-        # if we are supposed to generate only 20% of A,
-        # and we randomly select a number bigger than that,
-        # then we must generate the other type
-        particle_type = ParticleType.B
-
-    return particle_type
-
-
-def generate_particle(x, y, z, z0, parameters) -> ParticleType:
-    particle_type = decide_particle_type(parameters)
-
-    if particle_type == ParticleType.B:
-        density = parameters["density_B"]
-    else:
-        density = parameters["density_A"]
-
-    distance = parameters["distance"]  # Distance between the cubes
-    radii = arr.array("d", [parameters["r_A"], parameters["r_B"]])
-    heights = arr.array("d", [parameters["thickness_A"], parameters["thickness_B"]])
-    n_sides = parameters["num_sides"]
-    scale = parameters["scale"]
-    particle_volume = volume_prism(n_sides, scale * radii[particle_type], scale * heights[particle_type])
-    num_particles_x = int(parameters["num_particles_x"])  # Number of cubes along the X axis
-    num_particles_y = int(parameters["num_particles_y"])  # Number of cubes along the Y axis
-
-    bpy.ops.mesh.primitive_cylinder_add(
-        vertices=n_sides,
-        radius=scale * radii[particle_type],
-        depth=scale * heights[particle_type],
-        enter_editmode=False,
-        location=(
-            (x - num_particles_x / 2 + 0.5) * distance,
-            (y - num_particles_y / 2 + 0.5) * distance,
-            z0 + z * distance,
-        ),
-    )
-    # Get the active object (the newly created particle)
-    particle = bpy.context.active_object
-    # Assign a random rotation to the cube
-    particle.rotation_euler = (
-        random.uniform(0, 6.283185),
-        random.uniform(0, 6.283185),
-        random.uniform(0, 6.283185),
-    )
-    # Add rigid body physics to the particle
-    bpy.ops.rigidbody.object_add(type="ACTIVE")
-    particle.rigid_body.friction = parameters["particle_friction"]
-    particle.rigid_body.restitution = parameters["particle_restitution"]
-    particle.rigid_body.mass = density * particle_volume
-    particle.rigid_body.linear_damping = parameters["particle_damping"]
-    mat = bpy.data.materials.new("GenericMaterial")
-    mat.diffuse_color = (
-        float(COMBINATION_RED[particle_type]),
-        float(COMBINATION_GREEN[particle_type]),
-        float(COMBINATION_BLUE[particle_type]),
-        1.0,
-    )
-    mat.specular_intensity = 0
-    particle.active_material = mat
-
-    return particle_type
-
-def generate_piston(L_container, max_z_particles,parameters):
-    slack = PARAMETERS.get("container_piston_slack",0.0)
+def generate_piston(L_container, max_z_particles, parameters):
+    slack = PARAMETERS.get("container_piston_slack", 0.0)
     L_piston = (1 - slack) * L_container
     z_piston = 1.1 * max_z_particles + L_piston / 2
     bpy.ops.mesh.primitive_cube_add(
@@ -320,6 +314,7 @@ def generate_piston(L_container, max_z_particles,parameters):
     piston.name = "Piston"
 
     return z_piston, L_piston
+
 
 PARAMETERS = {
     "seed": None,
@@ -356,41 +351,25 @@ class PackingSimulation:
 
     def __init__(self, parameters: dict[str, Any]) -> None:
         self.parameters = parameters
+        self._clean_state()
+        self._initialize_random_state()
 
     def run(self):
         """Run the particle packing simulation."""  # noqa: D401
 
         parameters = self.parameters
-        seed = parameters["seed"]
-        random.seed(seed)  # Optional: set a seed for reproducible results
 
-        # Delete all existing mesh objects
-        bpy.ops.object.select_all(action="DESELECT")
-        bpy.ops.object.select_by_type(type="MESH")
-        bpy.ops.object.delete()
+        self._initialize_particles()
 
-        n_generated_particles_B = 0
-        n_generated_particles_A = 0
         num_particles_x = int(parameters["num_particles_x"])  # Number of cubes along the X axis
-        num_particles_y = int(parameters["num_particles_y"])  # Number of cubes along the Y axis
-        num_particles_z = int(parameters["num_particles_z"])  # Number of cubes along the Z axis
+        num_particles_z = int(parameters["num_particles_z"])  # Number of cubes along the Y axis
         distance = parameters["distance"]  # Distance between the cubes
-        z0 = distance / 2
-        for x in range(num_particles_x):
-            for y in range(num_particles_y):
-                for z in range(num_particles_z):
-                    generated_particle_type = generate_particle(
-                        x, y, z, z0, parameters)
-                    if generated_particle_type == ParticleType.A:
-                        n_generated_particles_A += 1
-                    else:
-                        n_generated_particles_B += 1
-
         L_container = num_particles_x * distance
+        z0 = distance / 2
         max_z_particles = z0 + num_particles_z * distance
 
         # add piston
-        z_piston, L_piston = generate_piston(L_container, max_z_particles,parameters)
+        z_piston, L_piston = generate_piston(L_container, max_z_particles, parameters)
 
         # create container
         container = create_container(
@@ -398,7 +377,41 @@ class PackingSimulation:
         )
         container.name = "Container"
 
-        bake_and_export(parameters,end_frame=230, container=container)
+        bake_and_export(parameters, end_frame=230, container=container)
+
+    def _initialize_particles(self):
+        n_generated_particles_B = 0
+        n_generated_particles_A = 0
+        parameters = self.parameters
+        num_particles_x = int(parameters["num_particles_x"])  # Number of cubes along the X axis
+        num_particles_y = int(parameters["num_particles_y"])  # Number of cubes along the Y axis
+        num_particles_z = int(parameters["num_particles_z"])  # Number of cubes along the Z axis
+        distance = parameters["distance"]  # Distance between the cubes
+        z0 = distance / 2
+        for ix in range(num_particles_x):
+            for iy in range(num_particles_y):
+                for iz in range(num_particles_z):
+                    x = (ix - num_particles_x / 2 + 0.5) * distance
+                    y = (iy - num_particles_y / 2 + 0.5) * distance
+                    z = z0 + iz * distance
+                    particle = Particle(x, y, z, parameters)
+
+                    if particle.type == ParticleType.A:
+                        n_generated_particles_A += 1
+                    else:
+                        n_generated_particles_B += 1
+
+    @staticmethod
+    def _clean_state():
+        # Delete all existing mesh objects
+        bpy.ops.object.select_all(action="DESELECT")
+        bpy.ops.object.select_by_type(type="MESH")
+        bpy.ops.object.delete()
+
+    def _initialize_random_state(self):
+        seed = self.parameters["seed"]
+        random.seed(seed)
+
 
 if __name__ == "__main__":
     PackingSimulation(PARAMETERS).run()
