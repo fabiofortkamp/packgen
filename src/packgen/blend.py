@@ -256,6 +256,7 @@ class Piston:
             piston.rigid_body.restitution = 0  # piston does not bounce when colliding
             piston.rigid_body.mass = parameters["mass_piston"]
             piston.name = "Piston"
+            self.name = piston.name
 
         self.z = z_piston
         self.L = L_piston
@@ -273,7 +274,7 @@ PARAMETERS = {
     "mass_fraction_B": 0.20,
     "num_particles_x": 4,
     "num_particles_y": 4,
-    "num_particles_z": 250,
+    "num_particles_z": 25,
     "num_sides": 6,
     "distance": 0.25,
     "quit_on_finish": False,
@@ -311,7 +312,8 @@ class PackingSimulation:
         container = self._initialize_container(piston)
 
         self.bake_and_export(
-            end_frame=self.parameters["end_frame"], container=container
+            end_frame=self.parameters["end_frame"],
+            objects_to_delete=[container, piston],
         )
 
     def _initialize_piston(self) -> Piston:
@@ -385,13 +387,13 @@ class PackingSimulation:
     def bake_and_export(
         self,
         end_frame: int,
-        container: Any = None,
+        objects_to_delete: Any = None,
     ) -> None:
         """Bake the physics simulation and export the results.
 
         Args:
             end_frame (int): The last frame to bake the simulation to.
-            container: The container of the particles that should be removed.
+            objects_to_delete: Objects that were created that should now be removed.
                 If None, no object will be removed.
 
         """
@@ -430,10 +432,12 @@ class PackingSimulation:
 
         # the container deletion should occur after the main saving above
         # to be able to inspect the Blender file
-        if container and container.name in bpy.data.objects:
-            # Method A: use the data API
-            obj = bpy.data.objects[container.name]
-            bpy.data.objects.remove(obj, do_unlink=True)
+        for object_to_delete in objects_to_delete:
+            if object_to_delete and object_to_delete.name in bpy.data.objects:
+                # Method A: use the data API
+                print()
+                obj = bpy.data.objects[object_to_delete.name]
+                bpy.data.objects.remove(obj, do_unlink=True)
 
         # export STL with the correct operator
         if parameters.get("save_files", True):
