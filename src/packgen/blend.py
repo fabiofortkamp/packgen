@@ -262,33 +262,7 @@ class Piston:
         self.L = L_piston
 
 
-PARAMETERS = {
-    "seed": None,
-    "scale": 1.0,
-    "r_B": 0.0295,
-    "r_A": 0.1,
-    "thickness_B": 0.027,
-    "thickness_A": 0.0871,
-    "density_B": 15.1,
-    "density_A": 5.1,
-    "mass_fraction_B": 0.20,
-    "num_particles_x": 4,
-    "num_particles_y": 4,
-    "num_particles_z": 25,
-    "num_sides": 6,
-    "distance": 0.25,
-    "quit_on_finish": False,
-    "mass_piston": 1,
-    "particle_restitution": 0.5,  # how much objects bounce after collision
-    "particle_friction": 0.8,  # fraction of velocity that is lost after collision
-    "particle_damping": 0.8,  # fraction of linear velocity that is lost over time
-    "save_files": True,
-    "container_wall_thickness": -0.2,
-    "container_piston_slack": 0.01,
-    "gravity_field": [0, 0, -5],
-    "end_frame": 500,
-    "use_piston": True,
-}
+PARAMETERS = load_parameters(get_parameters_file())
 
 COMBINATION_RED = arr.array("d", [0.1, 0.8])
 COMBINATION_GREEN = arr.array("d", [0.8, 0.4])

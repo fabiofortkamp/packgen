@@ -13,5 +13,15 @@
     "num_particles_z": 100,
     "num_sides": 6,
     "distance": 1.5,
-  "quit_on_finish": true
+    "quit_on_finish": true,
+    "mass_piston": 1,
+    "particle_restitution": 0.5,
+    "particle_friction": 0.8,
+    "particle_damping": 0.8,
+    "save_files": true,
+    "container_wall_thickness": -0.2,
+    "container_piston_slack": 0.01,
+    "gravity_field": [0, 0, -9.8],
+    "end_frame": 700,
+    "use_piston": true
 }
