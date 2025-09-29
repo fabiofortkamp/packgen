@@ -409,7 +409,6 @@ class PackingSimulation:
         for object_to_delete in objects_to_delete:
             if object_to_delete and object_to_delete.name in bpy.data.objects:
                 # Method A: use the data API
-                print()
                 obj = bpy.data.objects[object_to_delete.name]
                 bpy.data.objects.remove(obj, do_unlink=True)
 
