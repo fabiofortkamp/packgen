@@ -288,7 +288,8 @@ class PackingSimulation:
 
         self.bake_and_export(
             end_frame=self.parameters["end_frame"],
-            objects_to_delete=[container, piston],
+            objects_to_delete=None
+            #objects_to_delete=[container, piston],
         )
 
     def _initialize_piston(self) -> Piston:
@@ -407,11 +408,12 @@ class PackingSimulation:
 
         # the container deletion should occur after the main saving above
         # to be able to inspect the Blender file
-        for object_to_delete in objects_to_delete:
-            if object_to_delete and object_to_delete.name in bpy.data.objects:
-                # Method A: use the data API
-                obj = bpy.data.objects[object_to_delete.name]
-                bpy.data.objects.remove(obj, do_unlink=True)
+        if objects_to_delete is not None:
+            for object_to_delete in objects_to_delete:
+                if object_to_delete and object_to_delete.name in bpy.data.objects:
+                    # Method A: use the data API
+                    obj = bpy.data.objects[object_to_delete.name]
+                    bpy.data.objects.remove(obj, do_unlink=True)
 
         # export STL with the correct operator
         if parameters.get("save_files", True):
