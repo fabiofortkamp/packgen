@@ -233,6 +233,12 @@ class Container:
         cube.name = "Container"
         self.name = cube.name
 
+        # bpy.ops.mesh.primitive_uv_sphere_add(radius=1, enter_editmode=False, align='WORLD', location=(0, 0, 0),
+        #                                      scale=(1, 1, 1))
+        # bpy.ops.rigidbody.object_add(type="PASSIVE")
+        # sphere = bpy.context.active_object
+        # sphere.rigid_body.collision_shape = "MESH"
+
 
 class Piston:
     def __init__(self, L_container, max_z_particles, parameters) -> None:
