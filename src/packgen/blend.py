@@ -193,12 +193,13 @@ class Particle:
 
 
 class Container:
-    def __init__(self, side: float, height: float) -> None:
+    def __init__(self, side: float, height: float, parameters) -> None:
         """Create an open cube-like container of given side length and height.
 
         Args:
             side (float): The length of the sides of the cube.
             height (float): The height of the container.
+            parameters (dict): The parameters of the simulation.
 
         """
         height_to_side_scale = height / side
@@ -225,7 +226,7 @@ class Container:
 
         modifier = cube.modifiers.new(name="Solidify", type="SOLIDIFY")
 
-        modifier.thickness = PARAMETERS.get("container_wall_thickness", -0.2)
+        modifier.thickness = parameters.get("container_wall_thickness", -0.2)
 
         bpy.ops.rigidbody.object_add(type="PASSIVE")
         cube.rigid_body.collision_shape = "MESH"
@@ -235,7 +236,7 @@ class Container:
 
 class Piston:
     def __init__(self, L_container, max_z_particles, parameters) -> None:
-        slack = PARAMETERS.get("container_piston_slack", 0.0)
+        slack = parameters.get("container_piston_slack", 0.0)
         L_piston = (1 - slack) * L_container
         z_piston = 1.1 * max_z_particles + L_piston / 2
 
@@ -314,7 +315,7 @@ class PackingSimulation:
         distance = self.parameters["distance"]
         Lxy = num_particles_x * distance
         Lz = 1.1 * (z_piston + L_piston / 2)
-        container = Container(Lxy, Lz)
+        container = Container(Lxy, Lz, self.parameters)
         return container
 
     def _initialize_particles(self):
