@@ -233,11 +233,20 @@ class Container:
         cube.name = "Container"
         self.name = cube.name
 
-        # bpy.ops.mesh.primitive_uv_sphere_add(radius=1, enter_editmode=False, align='WORLD', location=(0, 0, 0),
-        #                                      scale=(1, 1, 1))
-        # bpy.ops.rigidbody.object_add(type="PASSIVE")
-        # sphere = bpy.context.active_object
-        # sphere.rigid_body.collision_shape = "MESH"
+        r_cone = parameters.get("r_B",side/10)
+        L_cone = parameters.get("thickness_B",side/10)
+        x_cone = side / 2 - abs(modifier.thickness) - L_cone/2
+        y_cone = 0
+        z_cone = 0.1*height
+
+        bpy.ops.mesh.primitive_cone_add(radius1=r_cone, radius2=0, depth=L_cone,
+                                        enter_editmode=False, align='WORLD',
+                                        location=(x_cone, y_cone, z_cone), scale=(1, 1, 1))
+        bpy.ops.rigidbody.object_add(type="PASSIVE")
+        cone = bpy.context.active_object
+        cone.rigid_body.collision_shape = "MESH"
+        cone.name = "Cone"
+
 
 
 class Piston:
