@@ -1,8 +1,21 @@
 """Tests for the volumetric calculations."""
 
+import importlib
+import os
 from math import isclose, sqrt
+from pathlib import Path
 
 from packgen import blend
+
+
+def test_blend_module_imports_without_parameters_file(tmp_path: Path) -> None:
+    """Importing packgen.blend must not require a parameters.json in cwd."""
+    original_cwd = Path.cwd()
+    os.chdir(tmp_path)
+    try:
+        importlib.reload(blend)
+    finally:
+        os.chdir(original_cwd)
 
 
 def test_volume_prism_coincides_with_hexagon() -> None:

@@ -37,16 +37,6 @@ def get_parameters_file() -> str:
     return parameters_file
 
 
-def get_params_suffix() -> str:
-    """Get the base name of the parameters file without extension to use as a suffix.
-
-    Returns:
-        str: The base name of the parameters file without extension.
-
-    """
-    return Path(get_parameters_file()).stem
-
-
 def load_parameters(
     parameters_file: str = "parameters.json",
 ) -> dict[str, float | bool]:
@@ -193,12 +183,14 @@ class Particle:
 
 
 class Container:
-    def __init__(self, side: float, height: float) -> None:
+    def __init__(self, side: float, height: float, *, wall_thickness: float) -> None:
         """Create an open cube-like container of given side length and height.
 
         Args:
             side (float): The length of the sides of the cube.
             height (float): The height of the container.
+            wall_thickness (float): Thickness of the solidify modifier
+                applied to the container walls.
 
         """
         height_to_side_scale = height / side
@@ -225,7 +217,7 @@ class Container:
 
         modifier = cube.modifiers.new(name="Solidify", type="SOLIDIFY")
 
-        modifier.thickness = PARAMETERS.get("container_wall_thickness", -0.2)
+        modifier.thickness = wall_thickness
 
         bpy.ops.rigidbody.object_add(type="PASSIVE")
         cube.rigid_body.collision_shape = "MESH"
@@ -235,7 +227,7 @@ class Container:
 
 class Piston:
     def __init__(self, L_container, max_z_particles, parameters) -> None:
-        slack = PARAMETERS.get("container_piston_slack", 0.0)
+        slack = parameters.get("container_piston_slack", 0.0)
         L_piston = (1 - slack) * L_container
         z_piston = 1.1 * max_z_particles + L_piston / 2
 
@@ -262,8 +254,6 @@ class Piston:
         self.L = L_piston
 
 
-PARAMETERS = load_parameters(get_parameters_file())
-
 COMBINATION_RED = arr.array("d", [0.1, 0.8])
 COMBINATION_GREEN = arr.array("d", [0.8, 0.4])
 COMBINATION_BLUE = arr.array("d", [0.7, 0.7])
@@ -272,8 +262,9 @@ COMBINATION_BLUE = arr.array("d", [0.7, 0.7])
 class PackingSimulation:
     """Packing simulation to be performed with the physics-engine."""
 
-    def __init__(self, parameters: dict[str, Any]) -> None:
+    def __init__(self, parameters: dict[str, Any], *, suffix: str) -> None:
         self.parameters = parameters
+        self._suffix = suffix
         self._clean_state()
         self._initialize_random_state()
 
@@ -313,7 +304,8 @@ class PackingSimulation:
         distance = self.parameters["distance"]
         Lxy = num_particles_x * distance
         Lz = 1.1 * (z_piston + L_piston / 2)
-        container = Container(Lxy, Lz)
+        wall_thickness = self.parameters.get("container_wall_thickness", -0.2)
+        container = Container(Lxy, Lz, wall_thickness=wall_thickness)
         return container
 
     def _initialize_particles(self):
@@ -390,7 +382,7 @@ class PackingSimulation:
 
         # Use the current working directory for all output files
         output_dir = Path(os.getcwd())
-        suffix = get_params_suffix()
+        suffix = self._suffix
         if parameters.get("save_blender_file", True):
             blend_path = output_dir / f"packing_{suffix}.blend"
             bpy.ops.wm.save_mainfile(filepath=str(blend_path))
@@ -417,5 +409,13 @@ class PackingSimulation:
             bpy.ops.wm.quit_blender()
 
 
+def main() -> None:
+    """Load parameters and run the packing simulation."""
+    parameters_file = get_parameters_file()
+    parameters = load_parameters(parameters_file)
+    suffix = Path(parameters_file).stem
+    PackingSimulation(parameters, suffix=suffix).run()
+
+
 if __name__ == "__main__":
-    PackingSimulation(PARAMETERS).run()
+    main()
