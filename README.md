@@ -29,7 +29,8 @@ packgen -- <path to the parameter file>
 
 You can name the parameters file in any way you want; this command will open Blender,
 simulate the packing, and then save `.blender`, `.stl`, and `.json` files in the current
-directory. The filenames will have file names as `packing_<basename of parameter file>.<extention>`.
+directory. The saving of each individual output file can be controlled by flags in the input file.
+The filenames will have file names as `packing_<basename of parameter file>.<extention>`.
 Here what they contain:
 
 - `.blend`: the complete Blender file that can be reproduced and used for rendering;
