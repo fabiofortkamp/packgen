@@ -20,6 +20,7 @@ import math
 import os
 import random
 import sys
+from dataclasses import asdict, dataclass
 from enum import IntEnum
 from pathlib import Path
 from typing import Any
@@ -37,25 +38,60 @@ def get_parameters_file() -> str:
     return parameters_file
 
 
-def load_parameters(
-    parameters_file: str = "parameters.json",
-) -> dict[str, float | bool]:
-    """Load parameters from a JSON file.
+@dataclass(frozen=True)
+class Parameters:
+    """Typed view of the packing-simulation input JSON.
 
-    Args:
-        parameters_file (str): Path to the parameters file.
-            Defaults to "parameters.json".
-
-    Returns:
-        dict[str, float]: The loaded parameters mapping strings to float values.
-            If 'seed' is null in the JSON, it will be converted to a random float.
-
+    Field names mirror the JSON keys so the file format is unchanged.
     """
-    with open(parameters_file) as f:
-        params = json.load(f)
-        if params.get("seed") is None:
-            params["seed"] = random.random() * 1e6
-        return params
+
+    scale: float
+    r_A: float
+    r_B: float
+    thickness_A: float
+    thickness_B: float
+    density_A: float
+    density_B: float
+    num_sides: int
+    num_particles_x: int
+    num_particles_y: int
+    num_particles_z: int
+    distance: float
+    mass_fraction_B: float
+    particle_friction: float
+    particle_restitution: float
+    particle_damping: float
+    mass_piston: float
+    end_frame: int
+    use_piston: bool
+    seed: float
+    container_wall_thickness: float = -0.2
+    container_piston_slack: float = 0.0
+    gravity_field: tuple[float, float, float] = (0.0, 0.0, -9.8)
+    save_blender_file: bool = True
+    save_json_file: bool = True
+    save_stl_file: bool = True
+    quit_on_finish: bool = False
+
+    @classmethod
+    def from_json(cls, path: str | Path) -> "Parameters":
+        """Load parameters from a JSON file.
+
+        A ``seed`` of ``null`` is replaced with a freshly generated random
+        value so the actually-used seed can be persisted on output.
+        """
+        with open(path) as f:
+            raw = json.load(f)
+        if raw.get("seed") is None:
+            raw["seed"] = random.random() * 1e6
+        if "gravity_field" in raw:
+            raw["gravity_field"] = tuple(raw["gravity_field"])
+        return cls(**raw)
+
+    @property
+    def num_particles_total(self) -> int:
+        """Total number of particles in the initial grid."""
+        return self.num_particles_x * self.num_particles_y * self.num_particles_z
 
 
 def volume_prism(sides: float, radius: float, height: float) -> float:
@@ -68,30 +104,14 @@ def volume_prism(sides: float, radius: float, height: float) -> float:
     return 1 / 2 * sides * radius * radius * math.sin(2 * math.pi / sides) * height
 
 
-def num_B_particles(parameters: dict[str, float], num_particles_total: int) -> int:
-    """Return the total number of type-B particles to be generated.
+def num_B_particles(parameters: Parameters, num_particles_total: int) -> int:
+    """Return the total number of type-B particles to be generated."""
+    V_B = volume_prism(parameters.num_sides, parameters.r_B, parameters.thickness_B)
+    V_A = volume_prism(parameters.num_sides, parameters.r_A, parameters.thickness_A)
 
-    Args:
-        parameters (dict[str, float]): The parameters of the packing simulation.
-        num_particles_total (int): The total number of particles to be generated.
+    beta = parameters.density_B * V_B / (parameters.density_A * V_A)
 
-    """
-    rho_B = parameters["density_B"]
-    rho_A = parameters["density_A"]
-
-    r_B = parameters["r_B"]
-    r_A = parameters["r_A"]
-
-    h_B = parameters["thickness_B"]
-    h_A = parameters["thickness_A"]
-
-    n_sides = int(parameters["num_sides"])
-    V_B = volume_prism(n_sides, r_B, h_B)
-    V_A = volume_prism(n_sides, r_A, h_A)
-
-    beta = rho_B * V_B / (rho_A * V_A)
-
-    x_B = parameters["mass_fraction_B"]
+    x_B = parameters.mass_fraction_B
     alpha = 1 / beta * (x_B / (1 - x_B))
 
     N_B = alpha / (1 + alpha) * num_particles_total
@@ -106,25 +126,32 @@ class ParticleType(IntEnum):
 
 
 class Particle:
-    def __init__(self, x: float, y: float, z: float, parameters) -> None:
-        self.parameters = parameters
-        particle_type = self.decide_particle_type()
+    def __init__(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        parameters: Parameters,
+        *,
+        number_fraction_A: float,
+    ) -> None:
+        particle_type = self._decide_particle_type(number_fraction_A)
         self.type = particle_type
-        if self.type == ParticleType.B:
-            density = parameters["density_B"]
-        else:
-            density = parameters["density_A"]
+        density = (
+            parameters.density_B if particle_type == ParticleType.B else parameters.density_A
+        )
 
-        radii = arr.array("d", [parameters["r_A"], parameters["r_B"]])
-        heights = arr.array("d", [parameters["thickness_A"], parameters["thickness_B"]])
-        n_sides = parameters["num_sides"]
-        scale = parameters["scale"]
+        radii = arr.array("d", [parameters.r_A, parameters.r_B])
+        heights = arr.array("d", [parameters.thickness_A, parameters.thickness_B])
+        scale = parameters.scale
         particle_volume = volume_prism(
-            n_sides, scale * radii[particle_type], scale * heights[particle_type]
+            parameters.num_sides,
+            scale * radii[particle_type],
+            scale * heights[particle_type],
         )
 
         bpy.ops.mesh.primitive_cylinder_add(
-            vertices=n_sides,
+            vertices=parameters.num_sides,
             radius=scale * radii[particle_type],
             depth=scale * heights[particle_type],
             enter_editmode=False,
@@ -140,10 +167,10 @@ class Particle:
         )
         # Add rigid body physics to the particle
         bpy.ops.rigidbody.object_add(type="ACTIVE")
-        particle.rigid_body.friction = parameters["particle_friction"]
-        particle.rigid_body.restitution = parameters["particle_restitution"]
+        particle.rigid_body.friction = parameters.particle_friction
+        particle.rigid_body.restitution = parameters.particle_restitution
         particle.rigid_body.mass = density * particle_volume
-        particle.rigid_body.linear_damping = parameters["particle_damping"]
+        particle.rigid_body.linear_damping = parameters.particle_damping
         mat = bpy.data.materials.new("GenericMaterial")
         mat.diffuse_color = (
             float(COMBINATION_RED[particle_type]),
@@ -154,32 +181,16 @@ class Particle:
         mat.specular_intensity = 0
         particle.active_material = mat
 
-    def decide_particle_type(self) -> ParticleType:
-        """Decide which cube type to generate."""
-        parameters = self.parameters
-        num_particles_x = int(
-            parameters["num_particles_x"]
-        )  # Number of cubes along the X axis
-        num_particles_y = int(
-            parameters["num_particles_y"]
-        )  # Number of cubes along the Y axis
-        num_particles_z = int(
-            parameters["num_particles_z"]
-        )  # Number of cubes along the Z axis
-        num_particles_total = num_particles_x * num_particles_y * num_particles_z
-        num_particles_B = num_B_particles(parameters, num_particles_total)
-        number_fraction_B = num_particles_B / num_particles_total
+    @staticmethod
+    def _decide_particle_type(number_fraction_A: float) -> ParticleType:
+        """Decide which particle type to generate, given the target fraction of A."""
         rnd = random.uniform(0.0, 1.0)
-        particle_type = ParticleType.A
-
-        number_fraction_A = 1 - number_fraction_B
         if rnd > number_fraction_A:
             # if we are supposed to generate only 20% of A,
             # and we randomly select a number bigger than that,
             # then we must generate the other type
-            particle_type = ParticleType.B
-
-        return particle_type
+            return ParticleType.B
+        return ParticleType.A
 
 
 class Container:
@@ -226,12 +237,14 @@ class Container:
 
 
 class Piston:
-    def __init__(self, L_container, max_z_particles, parameters) -> None:
-        slack = parameters.get("container_piston_slack", 0.0)
+    def __init__(
+        self, L_container: float, max_z_particles: float, parameters: Parameters
+    ) -> None:
+        slack = parameters.container_piston_slack
         L_piston = (1 - slack) * L_container
         z_piston = 1.1 * max_z_particles + L_piston / 2
 
-        if parameters["use_piston"]:
+        if parameters.use_piston:
             bpy.ops.mesh.primitive_cube_add(
                 size=L_piston,
                 enter_editmode=False,
@@ -246,7 +259,7 @@ class Piston:
                 0  # piston does not lose velocity when colliding
             )
             piston.rigid_body.restitution = 0  # piston does not bounce when colliding
-            piston.rigid_body.mass = parameters["mass_piston"]
+            piston.rigid_body.mass = parameters.mass_piston
             piston.name = "Piston"
             self.name = piston.name
 
@@ -262,82 +275,55 @@ COMBINATION_BLUE = arr.array("d", [0.7, 0.7])
 class PackingSimulation:
     """Packing simulation to be performed with the physics-engine."""
 
-    def __init__(self, parameters: dict[str, Any], *, suffix: str) -> None:
+    def __init__(self, parameters: Parameters, *, suffix: str) -> None:
         self.parameters = parameters
         self._suffix = suffix
+        n_B = num_B_particles(parameters, parameters.num_particles_total)
+        self._number_fraction_A = 1 - n_B / parameters.num_particles_total
         self._clean_state()
         self._initialize_random_state()
 
-    def run(self):
-        """Run the particle packing simulation."""  # noqa: D401
+    def run(self) -> None:
+        """Run the particle packing simulation."""
         self._initialize_particles()
 
         piston = self._initialize_piston()
         container = self._initialize_container(piston)
 
         self.bake_and_export(
-            end_frame=self.parameters["end_frame"],
+            end_frame=self.parameters.end_frame,
             objects_to_delete=[container, piston],
         )
 
     def _initialize_piston(self) -> Piston:
         parameters = self.parameters
-        num_particles_x = int(
-            parameters["num_particles_x"]
-        )  # Number of cubes along the X axis
-        num_particles_z = int(
-            parameters["num_particles_z"]
-        )  # Number of cubes along the Y axis
-        distance = parameters["distance"]  # Distance between the cubes
-        L_container = num_particles_x * distance
-        z0 = distance / 2
-        max_z_particles = z0 + num_particles_z * distance
-        # add piston
-        piston = Piston(L_container, max_z_particles, parameters)
-        return piston
+        L_container = parameters.num_particles_x * parameters.distance
+        z0 = parameters.distance / 2
+        max_z_particles = z0 + parameters.num_particles_z * parameters.distance
+        return Piston(L_container, max_z_particles, parameters)
 
-    def _initialize_container(self, piston) -> Container:
-        # create container
-        z_piston = piston.z
-        L_piston = piston.L
-        num_particles_x = self.parameters["num_particles_x"]
-        distance = self.parameters["distance"]
-        Lxy = num_particles_x * distance
-        Lz = 1.1 * (z_piston + L_piston / 2)
-        wall_thickness = self.parameters.get("container_wall_thickness", -0.2)
-        container = Container(Lxy, Lz, wall_thickness=wall_thickness)
-        return container
-
-    def _initialize_particles(self):
-        n_generated_particles_B = 0
-        n_generated_particles_A = 0
+    def _initialize_container(self, piston: Piston) -> Container:
         parameters = self.parameters
-        num_particles_x = int(
-            parameters["num_particles_x"]
-        )  # Number of cubes along the X axis
-        num_particles_y = int(
-            parameters["num_particles_y"]
-        )  # Number of cubes along the Y axis
-        num_particles_z = int(
-            parameters["num_particles_z"]
-        )  # Number of cubes along the Z axis
-        distance = parameters["distance"]  # Distance between the cubes
-        z0 = distance / 2
-        for ix in range(num_particles_x):
-            for iy in range(num_particles_y):
-                for iz in range(num_particles_z):
-                    x = (ix - num_particles_x / 2 + 0.5) * distance
-                    y = (iy - num_particles_y / 2 + 0.5) * distance
-                    z = z0 + iz * distance
-                    particle = Particle(x, y, z, parameters)
+        Lxy = parameters.num_particles_x * parameters.distance
+        Lz = 1.1 * (piston.z + piston.L / 2)
+        return Container(Lxy, Lz, wall_thickness=parameters.container_wall_thickness)
 
-                    if particle.type == ParticleType.A:
-                        n_generated_particles_A += 1
-                    else:
-                        n_generated_particles_B += 1
+    def _initialize_particles(self) -> None:
+        parameters = self.parameters
+        distance = parameters.distance
+        z0 = distance / 2
+        for ix in range(parameters.num_particles_x):
+            for iy in range(parameters.num_particles_y):
+                for iz in range(parameters.num_particles_z):
+                    x = (ix - parameters.num_particles_x / 2 + 0.5) * distance
+                    y = (iy - parameters.num_particles_y / 2 + 0.5) * distance
+                    z = z0 + iz * distance
+                    Particle(
+                        x, y, z, parameters, number_fraction_A=self._number_fraction_A
+                    )
 
     @staticmethod
-    def _clean_state():
+    def _clean_state() -> None:
         # Delete all existing mesh objects
         bpy.ops.object.select_all(action="DESELECT")
         bpy.ops.object.select_by_type(type="MESH")
@@ -345,9 +331,8 @@ class PackingSimulation:
 
         bpy.ops.ptcache.free_bake_all()
 
-    def _initialize_random_state(self):
-        seed = self.parameters["seed"]
-        random.seed(seed)
+    def _initialize_random_state(self) -> None:
+        random.seed(self.parameters.seed)
 
     def bake_and_export(
         self,
@@ -370,10 +355,8 @@ class PackingSimulation:
         scene.rigidbody_world.point_cache.frame_start = scene.frame_start
         scene.rigidbody_world.point_cache.frame_end = scene.frame_end
 
-        # setting gravity
         parameters = self.parameters
-        g = parameters.get("gravity_field", [0, 0, -9.8])
-        scene.gravity = g
+        scene.gravity = parameters.gravity_field
 
         bpy.ops.ptcache.bake_all()
 
@@ -383,14 +366,14 @@ class PackingSimulation:
         # Use the current working directory for all output files
         output_dir = Path(os.getcwd())
         suffix = self._suffix
-        if parameters.get("save_blender_file", True):
+        if parameters.save_blender_file:
             blend_path = output_dir / f"packing_{suffix}.blend"
             bpy.ops.wm.save_mainfile(filepath=str(blend_path))
-        if parameters.get("save_json_file", True):
+        if parameters.save_json_file:
             json_path = output_dir / f"packing_{suffix}.json"
 
             with open(json_path, mode="w") as f:
-                json.dump(parameters, f)
+                json.dump(asdict(parameters), f)
 
         # the container deletion should occur after the main saving above
         # to be able to inspect the Blender file
@@ -401,18 +384,18 @@ class PackingSimulation:
                 bpy.data.objects.remove(obj, do_unlink=True)
 
         # export STL with the correct operator
-        if parameters.get("save_stl_file", True):
+        if parameters.save_stl_file:
             stl_path = output_dir / f"packing_{suffix}.stl"
             bpy.ops.wm.stl_export(filepath=str(stl_path))
 
-        if parameters.get("quit_on_finish", False):
+        if parameters.quit_on_finish:
             bpy.ops.wm.quit_blender()
 
 
 def main() -> None:
     """Load parameters and run the packing simulation."""
     parameters_file = get_parameters_file()
-    parameters = load_parameters(parameters_file)
+    parameters = Parameters.from_json(parameters_file)
     suffix = Path(parameters_file).stem
     PackingSimulation(parameters, suffix=suffix).run()
 
