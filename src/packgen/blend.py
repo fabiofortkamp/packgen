@@ -14,7 +14,6 @@ The container configuration is also included.
 Original design and implementation by Andrea Insinga.
 """
 
-import array as arr
 import json
 import math
 import os
@@ -125,6 +124,56 @@ class ParticleType(IntEnum):
     B = 1
 
 
+PARTICLE_COLOR: dict[ParticleType, tuple[float, float, float]] = {
+    ParticleType.A: (0.1, 0.8, 0.7),
+    ParticleType.B: (0.8, 0.4, 0.7),
+}
+
+
+def particle_density(parameters: Parameters, particle_type: ParticleType) -> float:
+    """Return the bulk density of a particle of the given type."""
+    if particle_type == ParticleType.B:
+        return parameters.density_B
+    return parameters.density_A
+
+
+def particle_dimensions(
+    parameters: Parameters, particle_type: ParticleType
+) -> tuple[float, float]:
+    """Return (scaled circumscribed radius, scaled height) for the given type."""
+    radii = (parameters.r_A, parameters.r_B)
+    heights = (parameters.thickness_A, parameters.thickness_B)
+    return (
+        parameters.scale * radii[particle_type],
+        parameters.scale * heights[particle_type],
+    )
+
+
+def particle_mass(parameters: Parameters, particle_type: ParticleType) -> float:
+    """Return the rigid-body mass of a particle of the given type."""
+    radius, height = particle_dimensions(parameters, particle_type)
+    volume = volume_prism(parameters.num_sides, radius, height)
+    return particle_density(parameters, particle_type) * volume
+
+
+def decide_particle_type(number_fraction_A: float) -> ParticleType:
+    """Pick A or B by sampling one uniform draw against the target A fraction."""
+    if random.uniform(0.0, 1.0) > number_fraction_A:
+        # if we are supposed to generate only 20% of A,
+        # and we randomly select a number bigger than that,
+        # then we must generate the other type
+        return ParticleType.B
+    return ParticleType.A
+
+
+def _make_particle_material(particle_type: ParticleType) -> Any:
+    r, g, b = PARTICLE_COLOR[particle_type]
+    mat = bpy.data.materials.new("GenericMaterial")
+    mat.diffuse_color = (r, g, b, 1.0)
+    mat.specular_intensity = 0
+    return mat
+
+
 class Particle:
     def __init__(
         self,
@@ -135,62 +184,29 @@ class Particle:
         *,
         number_fraction_A: float,
     ) -> None:
-        particle_type = self._decide_particle_type(number_fraction_A)
-        self.type = particle_type
-        density = (
-            parameters.density_B if particle_type == ParticleType.B else parameters.density_A
-        )
-
-        radii = arr.array("d", [parameters.r_A, parameters.r_B])
-        heights = arr.array("d", [parameters.thickness_A, parameters.thickness_B])
-        scale = parameters.scale
-        particle_volume = volume_prism(
-            parameters.num_sides,
-            scale * radii[particle_type],
-            scale * heights[particle_type],
-        )
+        self.type = decide_particle_type(number_fraction_A)
+        radius, height = particle_dimensions(parameters, self.type)
+        mass = particle_mass(parameters, self.type)
 
         bpy.ops.mesh.primitive_cylinder_add(
             vertices=parameters.num_sides,
-            radius=scale * radii[particle_type],
-            depth=scale * heights[particle_type],
+            radius=radius,
+            depth=height,
             enter_editmode=False,
             location=(x, y, z),
         )
-        # Get the active object (the newly created particle)
-        particle = bpy.context.active_object
-        # Assign a random rotation to the cube
-        particle.rotation_euler = (
-            random.uniform(0, 6.283185),
-            random.uniform(0, 6.283185),
-            random.uniform(0, 6.283185),
+        obj = bpy.context.active_object
+        obj.rotation_euler = (
+            random.uniform(0, 2 * math.pi),
+            random.uniform(0, 2 * math.pi),
+            random.uniform(0, 2 * math.pi),
         )
-        # Add rigid body physics to the particle
         bpy.ops.rigidbody.object_add(type="ACTIVE")
-        particle.rigid_body.friction = parameters.particle_friction
-        particle.rigid_body.restitution = parameters.particle_restitution
-        particle.rigid_body.mass = density * particle_volume
-        particle.rigid_body.linear_damping = parameters.particle_damping
-        mat = bpy.data.materials.new("GenericMaterial")
-        mat.diffuse_color = (
-            float(COMBINATION_RED[particle_type]),
-            float(COMBINATION_GREEN[particle_type]),
-            float(COMBINATION_BLUE[particle_type]),
-            1.0,
-        )
-        mat.specular_intensity = 0
-        particle.active_material = mat
-
-    @staticmethod
-    def _decide_particle_type(number_fraction_A: float) -> ParticleType:
-        """Decide which particle type to generate, given the target fraction of A."""
-        rnd = random.uniform(0.0, 1.0)
-        if rnd > number_fraction_A:
-            # if we are supposed to generate only 20% of A,
-            # and we randomly select a number bigger than that,
-            # then we must generate the other type
-            return ParticleType.B
-        return ParticleType.A
+        obj.rigid_body.friction = parameters.particle_friction
+        obj.rigid_body.restitution = parameters.particle_restitution
+        obj.rigid_body.mass = mass
+        obj.rigid_body.linear_damping = parameters.particle_damping
+        obj.active_material = _make_particle_material(self.type)
 
 
 class Container:
@@ -265,11 +281,6 @@ class Piston:
 
         self.z = z_piston
         self.L = L_piston
-
-
-COMBINATION_RED = arr.array("d", [0.1, 0.8])
-COMBINATION_GREEN = arr.array("d", [0.8, 0.4])
-COMBINATION_BLUE = arr.array("d", [0.7, 0.7])
 
 
 class PackingSimulation:

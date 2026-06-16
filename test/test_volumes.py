@@ -3,6 +3,7 @@
 import importlib
 import json
 import os
+import random
 from math import isclose, sqrt
 from pathlib import Path
 
@@ -133,6 +134,93 @@ def test_num_B_particles_approaches_total_when_mass_fraction_B_near_one() -> Non
         **(_minimal_raw_parameters() | {"mass_fraction_B": 0.999999})  # type: ignore[arg-type]
     )
     assert blend.num_B_particles(p, p.num_particles_total) == p.num_particles_total
+
+
+def _parameters(**overrides: object) -> blend.Parameters:
+    return blend.Parameters(**(_minimal_raw_parameters() | overrides))  # type: ignore[arg-type]
+
+
+def test_particle_density_picks_per_type_value() -> None:
+    """particle_density returns density_A for A and density_B for B."""
+    p = _parameters(density_A=5.0, density_B=15.0)
+    assert blend.particle_density(p, blend.ParticleType.A) == 5.0
+    assert blend.particle_density(p, blend.ParticleType.B) == 15.0
+
+
+def test_particle_dimensions_scales_both_axes() -> None:
+    """The scale factor must be applied to both radius and height."""
+    p = _parameters(scale=2.5, r_A=0.1, thickness_A=0.08)
+    radius, height = blend.particle_dimensions(p, blend.ParticleType.A)
+    assert isclose(radius, 0.25)
+    assert isclose(height, 0.2)
+
+
+def test_particle_dimensions_picks_per_type() -> None:
+    """A and B must read from their own r_*/thickness_* fields, not be swapped."""
+    p = _parameters(
+        scale=1.0, r_A=0.1, r_B=0.05, thickness_A=0.08, thickness_B=0.03
+    )
+    assert blend.particle_dimensions(p, blend.ParticleType.A) == (0.1, 0.08)
+    assert blend.particle_dimensions(p, blend.ParticleType.B) == (0.05, 0.03)
+
+
+@pytest.mark.parametrize("particle_type", [blend.ParticleType.A, blend.ParticleType.B])
+def test_particle_mass_is_density_times_volume(
+    particle_type: blend.ParticleType,
+) -> None:
+    """particle_mass equals density(type) * volume_prism(num_sides, r, h)."""
+    p = _parameters()
+    radius, height = blend.particle_dimensions(p, particle_type)
+    expected = blend.particle_density(p, particle_type) * blend.volume_prism(
+        p.num_sides, radius, height
+    )
+    assert isclose(blend.particle_mass(p, particle_type), expected)
+
+
+def test_particle_mass_scales_linearly_with_density() -> None:
+    """Doubling density_A doubles the mass of an A particle."""
+    base = _parameters(density_A=5.0)
+    doubled = _parameters(density_A=10.0)
+    assert isclose(
+        blend.particle_mass(doubled, blend.ParticleType.A),
+        2 * blend.particle_mass(base, blend.ParticleType.A),
+    )
+
+
+def test_particle_mass_scales_cubically_with_scale() -> None:
+    """Doubling parameters.scale multiplies mass by 8 (radius^2 * height)."""
+    base = _parameters(scale=1.0)
+    doubled = _parameters(scale=2.0)
+    assert isclose(
+        blend.particle_mass(doubled, blend.ParticleType.A),
+        8 * blend.particle_mass(base, blend.ParticleType.A),
+    )
+
+
+def test_decide_particle_type_is_A_when_fraction_is_one() -> None:
+    """number_fraction_A == 1.0 must always yield A regardless of the draw."""
+    random.seed(0)
+    for _ in range(50):
+        assert blend.decide_particle_type(1.0) == blend.ParticleType.A
+
+
+def test_decide_particle_type_is_B_when_fraction_is_zero() -> None:
+    """number_fraction_A == 0.0 must always yield B regardless of the draw."""
+    random.seed(0)
+    for _ in range(50):
+        assert blend.decide_particle_type(0.0) == blend.ParticleType.B
+
+
+def test_decide_particle_type_distribution_matches_fraction() -> None:
+    """Empirical A fraction over 10_000 seeded draws stays within ±0.02 of target."""
+    target = 0.3
+    random.seed(20260616)
+    draws = 10_000
+    a_count = sum(
+        blend.decide_particle_type(target) == blend.ParticleType.A
+        for _ in range(draws)
+    )
+    assert abs(a_count / draws - target) < 0.02
 
 
 # Specification-based testing for the main geometry functions
