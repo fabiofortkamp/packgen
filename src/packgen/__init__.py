@@ -53,4 +53,4 @@ def main() -> None:
     if "--" in sys.argv:
         cmd_args = sys.argv[sys.argv.index("--") :]  # get all args after "--"
     args = [executable, BLENDER_SCRIPT_FLAG, str(BLENDER_SCRIPT)] + cmd_args
-    _ = subprocess.run(args)
+    _ = subprocess.run(args, check=False)

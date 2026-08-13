@@ -33,7 +33,18 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["pytest>=8.3.5"]
+dev = [
+  "basedpyright>=1.31.3",
+  "pytest-cov>=7.0.0",
+  "pytest>=8.3.5",
+  "ruff>=0.12.0",
+]
+
+[tool.pytest.ini_options]
+markers = [
+  "blender: tests that require a local Blender executable",
+  "slow: tests that are too slow for the default unit-test loop",
+]
 
 [tool.ruff.lint]
 extend-select = [
@@ -51,3 +62,13 @@ extend-ignore = [
 [tool.basedpyright]
 typeCheckingMode = "basic"
 allowedUntypedLibraries = ["bpy"]
+
+[tool.coverage.run]
+source = ["packgen"]
+omit = [
+  "src/packgen/blend.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

@@ -15,16 +15,29 @@ Original design and implementation by Andrea Insinga.
 """
 
 import json
-import math
 import os
-import random
 import sys
-from dataclasses import asdict, dataclass
-from enum import IntEnum
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-import bpy
+import bpy as _bpy
+
+if __package__ in {None, ""}:
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from packgen.core import (
+    PARTICLE_COLOR,
+    ContainerSpec,
+    PackingSpec,
+    Parameters,
+    ParticleSpec,
+    ParticleType,
+    PistonSpec,
+    build_packing_spec,
+)
+
+bpy: Any = _bpy
 
 
 def get_parameters_file() -> str:
@@ -37,135 +50,6 @@ def get_parameters_file() -> str:
     return parameters_file
 
 
-@dataclass(frozen=True)
-class Parameters:
-    """Typed view of the packing-simulation input JSON.
-
-    Field names mirror the JSON keys so the file format is unchanged.
-    """
-
-    scale: float
-    r_A: float
-    r_B: float
-    thickness_A: float
-    thickness_B: float
-    density_A: float
-    density_B: float
-    num_sides: int
-    num_particles_x: int
-    num_particles_y: int
-    num_particles_z: int
-    distance: float
-    mass_fraction_B: float
-    particle_friction: float
-    particle_restitution: float
-    particle_damping: float
-    mass_piston: float
-    end_frame: int
-    use_piston: bool
-    seed: float
-    container_wall_thickness: float = -0.2
-    container_piston_slack: float = 0.0
-    gravity_field: tuple[float, float, float] = (0.0, 0.0, -9.8)
-    save_blender_file: bool = True
-    save_json_file: bool = True
-    save_stl_file: bool = True
-    quit_on_finish: bool = False
-
-    @classmethod
-    def from_json(cls, path: str | Path) -> "Parameters":
-        """Load parameters from a JSON file.
-
-        A ``seed`` of ``null`` is replaced with a freshly generated random
-        value so the actually-used seed can be persisted on output.
-        """
-        with open(path) as f:
-            raw = json.load(f)
-        if raw.get("seed") is None:
-            raw["seed"] = random.random() * 1e6
-        if "gravity_field" in raw:
-            raw["gravity_field"] = tuple(raw["gravity_field"])
-        return cls(**raw)
-
-    @property
-    def num_particles_total(self) -> int:
-        """Total number of particles in the initial grid."""
-        return self.num_particles_x * self.num_particles_y * self.num_particles_z
-
-
-def volume_prism(sides: float, radius: float, height: float) -> float:
-    """Return the volume of a prism with given number of sides, radius, and height.
-
-    References:
-        https://en.wikipedia.org/wiki/Regular_polygon
-
-    """
-    return 1 / 2 * sides * radius * radius * math.sin(2 * math.pi / sides) * height
-
-
-def num_B_particles(parameters: Parameters, num_particles_total: int) -> int:
-    """Return the total number of type-B particles to be generated."""
-    V_B = volume_prism(parameters.num_sides, parameters.r_B, parameters.thickness_B)
-    V_A = volume_prism(parameters.num_sides, parameters.r_A, parameters.thickness_A)
-
-    beta = parameters.density_B * V_B / (parameters.density_A * V_A)
-
-    x_B = parameters.mass_fraction_B
-    alpha = 1 / beta * (x_B / (1 - x_B))
-
-    N_B = alpha / (1 + alpha) * num_particles_total
-
-    return math.ceil(N_B)
-
-
-class ParticleType(IntEnum):
-    INVALID = -1
-    A = 0
-    B = 1
-
-
-PARTICLE_COLOR: dict[ParticleType, tuple[float, float, float]] = {
-    ParticleType.A: (0.1, 0.8, 0.7),
-    ParticleType.B: (0.8, 0.4, 0.7),
-}
-
-
-def particle_density(parameters: Parameters, particle_type: ParticleType) -> float:
-    """Return the bulk density of a particle of the given type."""
-    if particle_type == ParticleType.B:
-        return parameters.density_B
-    return parameters.density_A
-
-
-def particle_dimensions(
-    parameters: Parameters, particle_type: ParticleType
-) -> tuple[float, float]:
-    """Return (scaled circumscribed radius, scaled height) for the given type."""
-    radii = (parameters.r_A, parameters.r_B)
-    heights = (parameters.thickness_A, parameters.thickness_B)
-    return (
-        parameters.scale * radii[particle_type],
-        parameters.scale * heights[particle_type],
-    )
-
-
-def particle_mass(parameters: Parameters, particle_type: ParticleType) -> float:
-    """Return the rigid-body mass of a particle of the given type."""
-    radius, height = particle_dimensions(parameters, particle_type)
-    volume = volume_prism(parameters.num_sides, radius, height)
-    return particle_density(parameters, particle_type) * volume
-
-
-def decide_particle_type(number_fraction_A: float) -> ParticleType:
-    """Pick A or B by sampling one uniform draw against the target A fraction."""
-    if random.uniform(0.0, 1.0) > number_fraction_A:
-        # if we are supposed to generate only 20% of A,
-        # and we randomly select a number bigger than that,
-        # then we must generate the other type
-        return ParticleType.B
-    return ParticleType.A
-
-
 def _make_particle_material(particle_type: ParticleType) -> Any:
     r, g, b = PARTICLE_COLOR[particle_type]
     mat = bpy.data.materials.new("GenericMaterial")
@@ -175,56 +59,37 @@ def _make_particle_material(particle_type: ParticleType) -> Any:
 
 
 class Particle:
-    def __init__(
-        self,
-        x: float,
-        y: float,
-        z: float,
-        parameters: Parameters,
-        *,
-        number_fraction_A: float,
-    ) -> None:
-        self.type = decide_particle_type(number_fraction_A)
-        radius, height = particle_dimensions(parameters, self.type)
-        mass = particle_mass(parameters, self.type)
+    """Create one Blender particle from a pure particle specification."""
 
+    def __init__(self, spec: ParticleSpec, *, num_sides: int) -> None:
+        """Create the mesh, rigid body, and material for one particle."""
         bpy.ops.mesh.primitive_cylinder_add(
-            vertices=parameters.num_sides,
-            radius=radius,
-            depth=height,
+            vertices=num_sides,
+            radius=spec.radius,
+            depth=spec.height,
             enter_editmode=False,
-            location=(x, y, z),
+            location=spec.location,
         )
         obj = bpy.context.active_object
-        obj.rotation_euler = (
-            random.uniform(0, 2 * math.pi),
-            random.uniform(0, 2 * math.pi),
-            random.uniform(0, 2 * math.pi),
-        )
+        obj.rotation_euler = spec.rotation
         bpy.ops.rigidbody.object_add(type="ACTIVE")
-        obj.rigid_body.friction = parameters.particle_friction
-        obj.rigid_body.restitution = parameters.particle_restitution
-        obj.rigid_body.mass = mass
-        obj.rigid_body.linear_damping = parameters.particle_damping
-        obj.active_material = _make_particle_material(self.type)
+        obj.rigid_body.friction = spec.friction
+        obj.rigid_body.restitution = spec.restitution
+        obj.rigid_body.mass = spec.mass
+        obj.rigid_body.linear_damping = spec.damping
+        obj.active_material = _make_particle_material(spec.particle_type)
 
 
 class Container:
-    def __init__(self, side: float, height: float, *, wall_thickness: float) -> None:
-        """Create an open cube-like container of given side length and height.
+    """Create the Blender container from a pure container specification."""
 
-        Args:
-            side (float): The length of the sides of the cube.
-            height (float): The height of the container.
-            wall_thickness (float): Thickness of the solidify modifier
-                applied to the container walls.
-
-        """
-        height_to_side_scale = height / side
+    def __init__(self, spec: ContainerSpec) -> None:
+        """Create an open cube-like container."""
+        height_to_side_scale = spec.height / spec.side_length
         bpy.ops.mesh.primitive_cube_add(
-            size=side,
+            size=spec.side_length,
             enter_editmode=False,
-            location=(0, 0, height / 2),
+            location=(0, 0, spec.height / 2),
             scale=(1, 1, height_to_side_scale),
         )
         cube = bpy.context.active_object
@@ -243,8 +108,7 @@ class Container:
         bpy.ops.object.mode_set(mode="OBJECT")
 
         modifier = cube.modifiers.new(name="Solidify", type="SOLIDIFY")
-
-        modifier.thickness = wall_thickness
+        modifier.thickness = spec.wall_thickness
 
         bpy.ops.rigidbody.object_add(type="PASSIVE")
         cube.rigid_body.collision_shape = "MESH"
@@ -253,128 +117,84 @@ class Container:
 
 
 class Piston:
-    def __init__(
-        self, L_container: float, max_z_particles: float, parameters: Parameters
-    ) -> None:
-        slack = parameters.container_piston_slack
-        L_piston = (1 - slack) * L_container
-        z_piston = 1.1 * max_z_particles + L_piston / 2
+    """Create the optional Blender piston from a pure piston specification."""
 
-        if parameters.use_piston:
+    def __init__(self, spec: PistonSpec) -> None:
+        """Create the piston mesh and rigid body when enabled."""
+        self.name: str | None = None
+
+        if spec.enabled:
             bpy.ops.mesh.primitive_cube_add(
-                size=L_piston,
+                size=spec.side_length,
                 enter_editmode=False,
                 align="WORLD",
-                location=(0, 0, z_piston),
+                location=(0, 0, spec.z),
                 scale=(1, 1, 1),
             )
 
             piston = bpy.context.active_object
             bpy.ops.rigidbody.object_add(type="ACTIVE")
-            piston.rigid_body.friction = (
-                0  # piston does not lose velocity when colliding
-            )
-            piston.rigid_body.restitution = 0  # piston does not bounce when colliding
-            piston.rigid_body.mass = parameters.mass_piston
+            piston.rigid_body.friction = 0
+            piston.rigid_body.restitution = 0
+            piston.rigid_body.mass = spec.mass
             piston.name = "Piston"
             self.name = piston.name
-
-        self.z = z_piston
-        self.L = L_piston
 
 
 class PackingSimulation:
     """Packing simulation to be performed with the physics-engine."""
 
-    def __init__(self, parameters: Parameters, *, suffix: str) -> None:
-        self.parameters = parameters
+    def __init__(self, spec: PackingSpec, *, suffix: str) -> None:
+        """Prepare a Blender simulation from a pure packing specification."""
+        self.spec = spec
         self._suffix = suffix
-        n_B = num_B_particles(parameters, parameters.num_particles_total)
-        self._number_fraction_A = 1 - n_B / parameters.num_particles_total
         self._clean_state()
-        self._initialize_random_state()
 
     def run(self) -> None:
         """Run the particle packing simulation."""
         self._initialize_particles()
 
         piston = self._initialize_piston()
-        container = self._initialize_container(piston)
+        container = self._initialize_container()
 
-        self.bake_and_export(
-            end_frame=self.parameters.end_frame,
-            objects_to_delete=[container, piston],
-        )
+        self.bake_and_export(objects_to_delete=[container, piston])
 
     def _initialize_piston(self) -> Piston:
-        parameters = self.parameters
-        L_container = parameters.num_particles_x * parameters.distance
-        z0 = parameters.distance / 2
-        max_z_particles = z0 + parameters.num_particles_z * parameters.distance
-        return Piston(L_container, max_z_particles, parameters)
+        return Piston(self.spec.piston)
 
-    def _initialize_container(self, piston: Piston) -> Container:
-        parameters = self.parameters
-        Lxy = parameters.num_particles_x * parameters.distance
-        Lz = 1.1 * (piston.z + piston.L / 2)
-        return Container(Lxy, Lz, wall_thickness=parameters.container_wall_thickness)
+    def _initialize_container(self) -> Container:
+        return Container(self.spec.container)
 
     def _initialize_particles(self) -> None:
-        parameters = self.parameters
-        distance = parameters.distance
-        z0 = distance / 2
-        for ix in range(parameters.num_particles_x):
-            for iy in range(parameters.num_particles_y):
-                for iz in range(parameters.num_particles_z):
-                    x = (ix - parameters.num_particles_x / 2 + 0.5) * distance
-                    y = (iy - parameters.num_particles_y / 2 + 0.5) * distance
-                    z = z0 + iz * distance
-                    Particle(
-                        x, y, z, parameters, number_fraction_A=self._number_fraction_A
-                    )
+        for particle in self.spec.particles:
+            Particle(particle, num_sides=self.spec.parameters.num_sides)
 
     @staticmethod
     def _clean_state() -> None:
-        # Delete all existing mesh objects
         bpy.ops.object.select_all(action="DESELECT")
         bpy.ops.object.select_by_type(type="MESH")
         bpy.ops.object.delete()
 
         bpy.ops.ptcache.free_bake_all()
 
-    def _initialize_random_state(self) -> None:
-        random.seed(self.parameters.seed)
-
     def bake_and_export(
         self,
-        end_frame: int,
         objects_to_delete: Any = None,
     ) -> None:
-        """Bake the physics simulation and export the results.
-
-        Args:
-            end_frame (int): The last frame to bake the simulation to.
-            objects_to_delete: Objects that were created that should now be removed.
-                If None, no object will be removed.
-
-        """
+        """Bake the physics simulation and export the results."""
         scene = bpy.context.scene
-        # set the frame range
-        scene.frame_start = 1
-        scene.frame_end = end_frame
-        # Match the rigid body world's cache frames to scene start and end
+        scene.frame_start = self.spec.frame_start
+        scene.frame_end = self.spec.frame_end
         scene.rigidbody_world.point_cache.frame_start = scene.frame_start
         scene.rigidbody_world.point_cache.frame_end = scene.frame_end
 
-        parameters = self.parameters
-        scene.gravity = parameters.gravity_field
+        parameters = self.spec.parameters
+        scene.gravity = self.spec.gravity
 
         bpy.ops.ptcache.bake_all()
 
-        # step to the last frame so all transforms are final
-        scene.frame_set(end_frame)
+        scene.frame_set(self.spec.frame_end)
 
-        # Use the current working directory for all output files
         output_dir = Path(os.getcwd())
         suffix = self._suffix
         if parameters.save_blender_file:
@@ -386,15 +206,11 @@ class PackingSimulation:
             with open(json_path, mode="w") as f:
                 json.dump(asdict(parameters), f)
 
-        # the container deletion should occur after the main saving above
-        # to be able to inspect the Blender file
-        for object_to_delete in objects_to_delete:
+        for object_to_delete in objects_to_delete or []:
             if object_to_delete and object_to_delete.name in bpy.data.objects:
-                # Method A: use the data API
                 obj = bpy.data.objects[object_to_delete.name]
                 bpy.data.objects.remove(obj, do_unlink=True)
 
-        # export STL with the correct operator
         if parameters.save_stl_file:
             stl_path = output_dir / f"packing_{suffix}.stl"
             bpy.ops.wm.stl_export(filepath=str(stl_path))
@@ -408,7 +224,7 @@ def main() -> None:
     parameters_file = get_parameters_file()
     parameters = Parameters.from_json(parameters_file)
     suffix = Path(parameters_file).stem
-    PackingSimulation(parameters, suffix=suffix).run()
+    PackingSimulation(build_packing_spec(parameters), suffix=suffix).run()
 
 
 if __name__ == "__main__":
