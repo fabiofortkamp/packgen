@@ -9,7 +9,8 @@ Currently, only hexagonal particles are implemented.
 
 1. Install [Blender][blender] and add the executable to the Path; it will
 be called `Blender` on macOS and `blender` on Linux. I will use `Blender` in the examples
-below;
+below. The simulation has been verified with **Blender 5.0.1 on macOS**; the package
+declares a minimum of `bpy>=4.4.0`, but only 5.0.1 has actually been smoke-tested;
 2. Install this project with `pip` or `uv pip`:
 
 ```shell
